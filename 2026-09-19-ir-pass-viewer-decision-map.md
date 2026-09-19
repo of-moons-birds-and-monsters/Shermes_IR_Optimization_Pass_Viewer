@@ -248,20 +248,33 @@ unavailable banner and must not be described as removed.
 Validate the workflow on the typed-class inlining failure before adding visual
 polish.
 
-## 4. Separate compiler output from diagnostics
+## 4. Keep compiler execution generic and optional
 
 **Blocked by:** 1, 2
 
 **Type:** Prototype
 
-**Question:** After file import works, how should the tool invoke Shermes when
-IR snapshots and compiler diagnostics share stderr?
+**Question:** Does the viewer need a Shermes-specific compiler runner?
 
-**Answer:** Add a runner as a second milestone. Capture stdout and stderr,
-recognize snapshot boundaries in stderr, preserve text outside parsed regions
-as diagnostics, record the exact compiler path and arguments, and never require
-successful code generation to inspect a partial dump. Avoid shell command
-construction; spawn the compiler with an argument array.
+**Answer:** No. Existing dump-file import is the primary workflow. If command
+execution is added, expose a generic command text input and working-directory
+input. Execute the text through the user's local shell exactly as requested;
+do not construct a Shermes invocation, interpret compiler flags, or require a
+successful compiler exit.
+
+An ordinary browser page cannot execute local processes. The generic runner
+therefore belongs to the optional local Node host/backend, not the browser UI
+itself. The host can use the platform shell (`$SHELL -lc` on the initial Unix
+target), stream stdout and stderr to separate UI panes, retain the exit status,
+and allow either captured stream or a subsequently imported file to become the
+dump document. If the user redirects output in the command, such as with Bash
+`&>`, they can import the resulting file.
+
+This input deliberately permits arbitrary shell execution, so it must require
+an explicit Run action and must never be exposed through an unauthenticated
+network listener. Bind the local host to loopback and use a per-launch token if
+the browser communicates with it over HTTP. Display the exact command and
+working directory with each captured run as provenance.
 
 ## 5. Decide how much IR awareness the diff needs
 
