@@ -1,0 +1,1108 @@
+{
+  "format": "shermes-ir-dump-corpus-survey",
+  "version": 1,
+  "summary": {
+    "fileCount": 15,
+    "totalBytes": 29293460,
+    "totalLines": 558733,
+    "initialSnapshotCount": 122,
+    "afterPassSnapshotCount": 1330,
+    "functionHeaderCount": 16324,
+    "functionEndCount": 16324,
+    "lineEndings": {
+      "lf": 558733,
+      "crlf": 0,
+      "cr": 0,
+      "none": 0
+    },
+    "invalidUtf8FileCount": 0,
+    "ansiEscapeFileCount": 0,
+    "maxLineLength": {
+      "codeUnits": 1269,
+      "file": "controlFlowProducingMultipleBB.dump.txt",
+      "line": 31,
+      "offset": 1459
+    }
+  },
+  "passNames": [
+    {
+      "name": "Auditor",
+      "count": 15
+    },
+    {
+      "name": "CodeMotion",
+      "count": 15
+    },
+    {
+      "name": "CSE",
+      "count": 30
+    },
+    {
+      "name": "DCE",
+      "count": 90
+    },
+    {
+      "name": "DedupReifyArguments",
+      "count": 15
+    },
+    {
+      "name": "FrameLoadStoreOpts",
+      "count": 45
+    },
+    {
+      "name": "FuncSigOpts",
+      "count": 15
+    },
+    {
+      "name": "FunctionAnalysis",
+      "count": 45
+    },
+    {
+      "name": "Inlining",
+      "count": 30
+    },
+    {
+      "name": "InstSimplify",
+      "count": 45
+    },
+    {
+      "name": "LimitAllocArray",
+      "count": 15
+    },
+    {
+      "name": "LoadConstants",
+      "count": 15
+    },
+    {
+      "name": "LowerAllocObjectLiteral",
+      "count": 15
+    },
+    {
+      "name": "LowerArgumentsArray",
+      "count": 15
+    },
+    {
+      "name": "LowerBuiltinCalls",
+      "count": 15
+    },
+    {
+      "name": "LowerBuiltinCallsOptimized",
+      "count": 15
+    },
+    {
+      "name": "LowerCalls",
+      "count": 77
+    },
+    {
+      "name": "LowerGeneratorFunction",
+      "count": 30
+    },
+    {
+      "name": "LowerNumericProperties",
+      "count": 15
+    },
+    {
+      "name": "LowerPrivateBrandCheck",
+      "count": 15
+    },
+    {
+      "name": "LowerScopes",
+      "count": 15
+    },
+    {
+      "name": "LowerStoreInstrs",
+      "count": 77
+    },
+    {
+      "name": "MetroRequire",
+      "count": 15
+    },
+    {
+      "name": "MovElimination",
+      "count": 77
+    },
+    {
+      "name": "ObjectMergeNewStores",
+      "count": 15
+    },
+    {
+      "name": "ObjectStackPromotion",
+      "count": 30
+    },
+    {
+      "name": "OptEnvironmentInit",
+      "count": 15
+    },
+    {
+      "name": "PeepholeLowering",
+      "count": 15
+    },
+    {
+      "name": "PrivateBrandCheckDedup",
+      "count": 15
+    },
+    {
+      "name": "RecreateCheapValues",
+      "count": 77
+    },
+    {
+      "name": "RemoveMovs",
+      "count": 77
+    },
+    {
+      "name": "ResolveStaticRequire",
+      "count": 15
+    },
+    {
+      "name": "ScopeElimination",
+      "count": 30
+    },
+    {
+      "name": "ScopeHoisting",
+      "count": 15
+    },
+    {
+      "name": "SimpleMem2Reg",
+      "count": 60
+    },
+    {
+      "name": "SimpleStackPromotion",
+      "count": 60
+    },
+    {
+      "name": "SimplifyCFG",
+      "count": 45
+    },
+    {
+      "name": "StripDebugInsts",
+      "count": 15
+    },
+    {
+      "name": "SwitchLowering",
+      "count": 15
+    },
+    {
+      "name": "TDZDedup",
+      "count": 15
+    },
+    {
+      "name": "TypeInference",
+      "count": 60
+    }
+  ],
+  "functionHeaderKinds": {
+    "base constructor": {
+      "count": 432,
+      "distinctCount": 12,
+      "examples": [
+        {
+          "file": "classes.dump.txt",
+          "line": 3264,
+          "offset": 175874,
+          "text": "base constructor Walker(id: number, parent: undefined|object): any [typed]"
+        },
+        {
+          "file": "classes.dump.txt",
+          "line": 49253,
+          "offset": 2605494,
+          "text": "base constructor Walker(id: number, parent: undefined|object): undefined [typed]"
+        },
+        {
+          "file": "classObjects.dump.txt",
+          "line": 709,
+          "offset": 36921,
+          "text": "base constructor EasyClass(name: string): any [typed]"
+        },
+        {
+          "file": "classObjects.dump.txt",
+          "line": 10888,
+          "offset": 543972,
+          "text": "base constructor EasyClass(name: string): undefined [typed]"
+        },
+        {
+          "file": "objectTypeMethods.dump.txt",
+          "line": 833,
+          "offset": 45678,
+          "text": "base constructor ClassA(name: string, className: string): any [typed]"
+        },
+        {
+          "file": "objectTypeMethods.dump.txt",
+          "line": 15270,
+          "offset": 805310,
+          "text": "base constructor ClassA(name: string, className: string): undefined [typed]"
+        },
+        {
+          "file": "type_scope.dump.txt",
+          "line": 951,
+          "offset": 53259,
+          "text": "base constructor TestClass(test: object): any [typed]"
+        },
+        {
+          "file": "type_scope.dump.txt",
+          "line": 1001,
+          "offset": 56322,
+          "text": "base constructor FakeTestClass(val: string): any [typed]"
+        },
+        {
+          "file": "type_scope.dump.txt",
+          "line": 1130,
+          "offset": 63874,
+          "text": "base constructor \"TestClass 1#\"(test: object): any [typed]"
+        },
+        {
+          "file": "type_scope.dump.txt",
+          "line": 18343,
+          "offset": 1028148,
+          "text": "base constructor TestClass(test: object): undefined [typed]"
+        },
+        {
+          "file": "type_scope.dump.txt",
+          "line": 18357,
+          "offset": 1028879,
+          "text": "base constructor FakeTestClass(val: string): undefined [typed]"
+        },
+        {
+          "file": "type_scope.dump.txt",
+          "line": 18426,
+          "offset": 1032990,
+          "text": "base constructor \"TestClass 1#\"(test: object): undefined [typed]"
+        }
+      ]
+    },
+    "derived constructor": {
+      "count": 72,
+      "distinctCount": 2,
+      "examples": [
+        {
+          "file": "objectTypeMethods.dump.txt",
+          "line": 853,
+          "offset": 46723,
+          "text": "derived constructor ClassB(name: string, className: string, idNumber: number): any [typed]"
+        },
+        {
+          "file": "objectTypeMethods.dump.txt",
+          "line": 15282,
+          "offset": 805890,
+          "text": "derived constructor ClassB(name: string, className: string, idNumber: number): undefined [typed]"
+        }
+      ]
+    },
+    "generator inner": {
+      "count": 64,
+      "distinctCount": 8,
+      "examples": [
+        {
+          "file": "generator_and_async_functions.dump.txt",
+          "line": 705,
+          "offset": 35489,
+          "text": "generator inner \"generator 1#\"(): any "
+        },
+        {
+          "file": "generator_and_async_functions.dump.txt",
+          "line": 756,
+          "offset": 37248,
+          "text": "generator inner \"generatorArrow 1#\"(): any "
+        },
+        {
+          "file": "generator_and_async_functions.dump.txt",
+          "line": 807,
+          "offset": 39006,
+          "text": "generator inner \"?anon_0_asyncFunction 1#\"(): any "
+        },
+        {
+          "file": "generator_and_async_functions.dump.txt",
+          "line": 823,
+          "offset": 39505,
+          "text": "generator inner \"?anon_0_asyncArrow 1#\"(): any "
+        },
+        {
+          "file": "generator_and_async_functions.dump.txt",
+          "line": 3234,
+          "offset": 156793,
+          "text": "generator inner \"generator 1#\"(action: number, value: any): any "
+        },
+        {
+          "file": "generator_and_async_functions.dump.txt",
+          "line": 3423,
+          "offset": 166332,
+          "text": "generator inner \"generatorArrow 1#\"(action: number, value: any): any "
+        },
+        {
+          "file": "generator_and_async_functions.dump.txt",
+          "line": 3612,
+          "offset": 175870,
+          "text": "generator inner \"?anon_0_asyncFunction 1#\"(action: number, value: any): any "
+        },
+        {
+          "file": "generator_and_async_functions.dump.txt",
+          "line": 3692,
+          "offset": 179593,
+          "text": "generator inner \"?anon_0_asyncArrow 1#\"(action: number, value: any): any "
+        }
+      ]
+    },
+    "function": {
+      "count": 14952,
+      "distinctCount": 382,
+      "examples": [
+        {
+          "file": "classes.dump.txt",
+          "line": 4,
+          "offset": 34,
+          "text": "function global(): any "
+        },
+        {
+          "file": "classes.dump.txt",
+          "line": 18,
+          "offset": 1385,
+          "text": "function \"\"(): any "
+        },
+        {
+          "file": "classes.dump.txt",
+          "line": 132,
+          "offset": 10377,
+          "text": "function __SameValueZero(x: any, y: any): any [typed]"
+        },
+        {
+          "file": "classes.dump.txt",
+          "line": 162,
+          "offset": 11577,
+          "text": "function __ToIntegerOrInfinity(n: number): any [typed]"
+        },
+        {
+          "file": "classes.dump.txt",
+          "line": 209,
+          "offset": 13694,
+          "text": "function charAt(pos: any): any "
+        },
+        {
+          "file": "classes.dump.txt",
+          "line": 223,
+          "offset": 14192,
+          "text": "function at(index: any): any "
+        },
+        {
+          "file": "classes.dump.txt",
+          "line": 242,
+          "offset": 15066,
+          "text": "function charCodeAt(pos: any): any "
+        },
+        {
+          "file": "classes.dump.txt",
+          "line": 261,
+          "offset": 15948,
+          "text": "function codePointAt(pos: any): any "
+        },
+        {
+          "file": "classes.dump.txt",
+          "line": 280,
+          "offset": 16834,
+          "text": "function concat(other: any): any "
+        },
+        {
+          "file": "classes.dump.txt",
+          "line": 294,
+          "offset": 17362,
+          "text": "function endsWith(searchString: any, endPosition: any): any "
+        },
+        {
+          "file": "classes.dump.txt",
+          "line": 316,
+          "offset": 18521,
+          "text": "function includes(searchString: any, position: any): any "
+        },
+        {
+          "file": "classes.dump.txt",
+          "line": 338,
+          "offset": 19673,
+          "text": "function indexOf(searchString: any, position: any): any "
+        }
+      ]
+    },
+    "arrow": {
+      "count": 483,
+      "distinctCount": 20,
+      "examples": [
+        {
+          "file": "functionKinds.dump.txt",
+          "line": 3258,
+          "offset": 174417,
+          "text": "arrow arrowFunc(val: string, counter: number): any [typed]"
+        },
+        {
+          "file": "functionKinds.dump.txt",
+          "line": 3319,
+          "offset": 177912,
+          "text": "arrow \" 2#\"(): any "
+        },
+        {
+          "file": "functionKinds.dump.txt",
+          "line": 3330,
+          "offset": 178263,
+          "text": "arrow \" 3#\"(): any "
+        },
+        {
+          "file": "functionKinds.dump.txt",
+          "line": 3341,
+          "offset": 178614,
+          "text": "arrow \" 4#\"(): any "
+        },
+        {
+          "file": "functionKinds.dump.txt",
+          "line": 47277,
+          "offset": 2489590,
+          "text": "arrow arrowFunc(val: string, counter: number): object [typed]"
+        },
+        {
+          "file": "functionKinds.dump.txt",
+          "line": 47316,
+          "offset": 2491980,
+          "text": "arrow \" 2#\"(): object "
+        },
+        {
+          "file": "functionKinds.dump.txt",
+          "line": 47324,
+          "offset": 2492291,
+          "text": "arrow \" 3#\"(): object "
+        },
+        {
+          "file": "functionKinds.dump.txt",
+          "line": 47332,
+          "offset": 2492602,
+          "text": "arrow \" 4#\"(): object "
+        },
+        {
+          "file": "objectAccess.dump.txt",
+          "line": 742,
+          "offset": 38403,
+          "text": "arrow __export(target: any, all: any): any "
+        },
+        {
+          "file": "objectAccess.dump.txt",
+          "line": 10227,
+          "offset": 519486,
+          "text": "arrow __export(target: any, all: any): any [allCallsitesKnownInStrictMode]"
+        },
+        {
+          "file": "objectAccess.dump.txt",
+          "line": 11471,
+          "offset": 579218,
+          "text": "arrow __export(target: any, all: any): undefined [allCallsitesKnownInStrictMode,unreachable]"
+        },
+        {
+          "file": "objectTypeMethods.dump.txt",
+          "line": 803,
+          "offset": 44391,
+          "text": "arrow \" 2#\"(val: any): any [typed]"
+        }
+      ]
+    },
+    "method": {
+      "count": 321,
+      "distinctCount": 14,
+      "examples": [
+        {
+          "file": "classObjects.dump.txt",
+          "line": 737,
+          "offset": 38057,
+          "text": "method \"returnNameGreeting 1#\"(): any "
+        },
+        {
+          "file": "classObjects.dump.txt",
+          "line": 749,
+          "offset": 38465,
+          "text": "method \"returnNameGreeting 2#\"(): any "
+        },
+        {
+          "file": "classObjects.dump.txt",
+          "line": 10905,
+          "offset": 544613,
+          "text": "method \"returnNameGreeting 1#\"(): string "
+        },
+        {
+          "file": "classObjects.dump.txt",
+          "line": 10913,
+          "offset": 544869,
+          "text": "method \"returnNameGreeting 2#\"(): string "
+        },
+        {
+          "file": "type_scope.dump.txt",
+          "line": 931,
+          "offset": 52234,
+          "text": "method returnIt(module: any, exports: any): any "
+        },
+        {
+          "file": "type_scope.dump.txt",
+          "line": 1053,
+          "offset": 59352,
+          "text": "method \"testFunction 1#\"(test: any): any "
+        },
+        {
+          "file": "type_scope.dump.txt",
+          "line": 18332,
+          "offset": 1027558,
+          "text": "method returnIt(module: any, exports: any): undefined "
+        },
+        {
+          "file": "type_scope.dump.txt",
+          "line": 18395,
+          "offset": 1031199,
+          "text": "method \"testFunction 1#\"(test: any): undefined "
+        },
+        {
+          "file": "unusual_internal_names.dump.txt",
+          "line": 738,
+          "offset": 36871,
+          "text": "method \"name with spaces\"(): any "
+        },
+        {
+          "file": "unusual_internal_names.dump.txt",
+          "line": 747,
+          "offset": 37125,
+          "text": "method name-with-punctuation(): any "
+        },
+        {
+          "file": "unusual_internal_names.dump.txt",
+          "line": 10541,
+          "offset": 508253,
+          "text": "method \"name with spaces\"(): undefined "
+        },
+        {
+          "file": "unusual_internal_names.dump.txt",
+          "line": 10546,
+          "offset": 508352,
+          "text": "method name-with-punctuation(): undefined "
+        }
+      ]
+    }
+  },
+  "scopeLines": {
+    "count": 7559,
+    "distinctCount": 230,
+    "examples": [
+      {
+        "file": "classes.dump.txt",
+        "line": 2,
+        "offset": 19,
+        "text": "scope %VS0 []"
+      },
+      {
+        "file": "classes.dump.txt",
+        "line": 16,
+        "offset": 547,
+        "text": "scope %VS1 [__SameValueZero: any, __ToIntegerOrInfinity: any, charAt: any, at: any, charCodeAt: any, codePointAt: any, concat: any, endsWith: any, includes: any, indexOf: any, lastIndexOf: any, padEnd: any, padStart: any, repeat: any, slice: any, split: any, startsWith: any, substring: any, toLowerCase: any, toUpperCase: any, trim: any, trimStart: any, trimEnd: any, toFixed: any, toPrecision: any, toExponential: any, toString: any, Array: any, includes#1: object, concat#1: object, toString#1: ob…",
+        "truncated": true
+      },
+      {
+        "file": "classes.dump.txt",
+        "line": 130,
+        "offset": 10348,
+        "text": "scope %VS2 [x: any, y: any]"
+      },
+      {
+        "file": "classes.dump.txt",
+        "line": 160,
+        "offset": 11544,
+        "text": "scope %VS3 [n: any, trunc: any]"
+      },
+      {
+        "file": "classes.dump.txt",
+        "line": 207,
+        "offset": 13671,
+        "text": "scope %VS4 [pos: any]"
+      },
+      {
+        "file": "classes.dump.txt",
+        "line": 221,
+        "offset": 14167,
+        "text": "scope %VS5 [index: any]"
+      },
+      {
+        "file": "classes.dump.txt",
+        "line": 240,
+        "offset": 15043,
+        "text": "scope %VS6 [pos: any]"
+      },
+      {
+        "file": "classes.dump.txt",
+        "line": 259,
+        "offset": 15925,
+        "text": "scope %VS7 [pos: any]"
+      },
+      {
+        "file": "classes.dump.txt",
+        "line": 278,
+        "offset": 16809,
+        "text": "scope %VS8 [other: any]"
+      },
+      {
+        "file": "classes.dump.txt",
+        "line": 292,
+        "offset": 17312,
+        "text": "scope %VS9 [searchString: any, endPosition: any]"
+      },
+      {
+        "file": "classes.dump.txt",
+        "line": 314,
+        "offset": 18473,
+        "text": "scope %VS10 [searchString: any, position: any]"
+      },
+      {
+        "file": "classes.dump.txt",
+        "line": 336,
+        "offset": 19625,
+        "text": "scope %VS11 [searchString: any, position: any]"
+      }
+    ]
+  },
+  "markerLikeLines": {
+    "count": 296,
+    "distinctCount": 16,
+    "examples": [
+      {
+        "file": "sentinel_like_strings.dump.txt",
+        "line": 647,
+        "offset": 32589,
+        "text": "  %5 = CallInst (:any) %4: any, empty: any, false: boolean, empty: any, undefined: undefined, undefined: undefined, \"*** INITIAL STATE\": string"
+      },
+      {
+        "file": "sentinel_like_strings.dump.txt",
+        "line": 649,
+        "offset": 32811,
+        "text": "  %7 = CallInst (:any) %6: any, empty: any, false: boolean, empty: any, undefined: undefined, undefined: undefined, \"*** AFTER DCE\": string"
+      },
+      {
+        "file": "sentinel_like_strings.dump.txt",
+        "line": 653,
+        "offset": 33261,
+        "text": "  %11 = CallInst (:any) %10: any, empty: any, false: boolean, empty: any, undefined: undefined, undefined: undefined, \"function_end\": string"
+      },
+      {
+        "file": "sentinel_like_strings.dump.txt",
+        "line": 655,
+        "offset": 33481,
+        "text": "  %13 = CallInst (:any) %12: any, empty: any, false: boolean, empty: any, undefined: undefined, undefined: undefined, \"scope %VS0\": string"
+      },
+      {
+        "file": "sentinel_like_strings.dump.txt",
+        "line": 8611,
+        "offset": 434910,
+        "text": "  %41 = CallInst (:any) %40: any, empty: any, false: boolean, empty: any, undefined: undefined, undefined: undefined, \"*** INITIAL STATE\": string"
+      },
+      {
+        "file": "sentinel_like_strings.dump.txt",
+        "line": 8613,
+        "offset": 435135,
+        "text": "  %43 = CallInst (:any) %42: any, empty: any, false: boolean, empty: any, undefined: undefined, undefined: undefined, \"*** AFTER DCE\": string"
+      },
+      {
+        "file": "sentinel_like_strings.dump.txt",
+        "line": 8617,
+        "offset": 435590,
+        "text": "  %47 = CallInst (:any) %46: any, empty: any, false: boolean, empty: any, undefined: undefined, undefined: undefined, \"function_end\": string"
+      },
+      {
+        "file": "sentinel_like_strings.dump.txt",
+        "line": 8619,
+        "offset": 435810,
+        "text": "  %49 = CallInst (:any) %48: any, empty: any, false: boolean, empty: any, undefined: undefined, undefined: undefined, \"scope %VS0\": string"
+      },
+      {
+        "file": "sentinel_like_strings.dump.txt",
+        "line": 8666,
+        "offset": 438979,
+        "text": "  %63 = CallInst (:any) %62: any, empty: any, false: boolean, empty: any, undefined: undefined, undefined: undefined, \"*** INITIAL STATE\": string"
+      },
+      {
+        "file": "sentinel_like_strings.dump.txt",
+        "line": 8668,
+        "offset": 439204,
+        "text": "  %65 = CallInst (:any) %64: any, empty: any, false: boolean, empty: any, undefined: undefined, undefined: undefined, \"*** AFTER DCE\": string"
+      },
+      {
+        "file": "sentinel_like_strings.dump.txt",
+        "line": 8672,
+        "offset": 439659,
+        "text": "  %69 = CallInst (:any) %68: any, empty: any, false: boolean, empty: any, undefined: undefined, undefined: undefined, \"function_end\": string"
+      },
+      {
+        "file": "sentinel_like_strings.dump.txt",
+        "line": 8674,
+        "offset": 439879,
+        "text": "  %71 = CallInst (:any) %70: any, empty: any, false: boolean, empty: any, undefined: undefined, undefined: undefined, \"scope %VS0\": string"
+      }
+    ]
+  },
+  "outsideTraceLines": {
+    "count": 48,
+    "distinctCount": 45,
+    "examples": [
+      {
+        "file": "classObjects.dump.txt",
+        "line": 0,
+        "offset": 0,
+        "text": "./classObjects.ts:13:3: warning: ft: unsupported property for typed object, assuming 'any'"
+      },
+      {
+        "file": "classObjects.dump.txt",
+        "line": 1,
+        "offset": 91,
+        "text": "  returnNameGreeting(): string {"
+      },
+      {
+        "file": "classObjects.dump.txt",
+        "line": 2,
+        "offset": 124,
+        "text": "  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+      },
+      {
+        "file": "classObjects.dump.txt",
+        "line": 3,
+        "offset": 157,
+        "text": "./classObjects.ts:19:3: warning: ft: unsupported property for typed object, assuming 'any'"
+      },
+      {
+        "file": "controlFlowProducingMultipleBB.dump.txt",
+        "line": 0,
+        "offset": 0,
+        "text": "./controlFlowProducingMultipleBB.ts:167:19: warning: the variable \"_fopen\" was not declared in function \"fopen\""
+      },
+      {
+        "file": "controlFlowProducingMultipleBB.dump.txt",
+        "line": 1,
+        "offset": 112,
+        "text": "    let filePtr = _fopen(pathz, modez);"
+      },
+      {
+        "file": "controlFlowProducingMultipleBB.dump.txt",
+        "line": 2,
+        "offset": 152,
+        "text": "                  ^~~~~~"
+      },
+      {
+        "file": "controlFlowProducingMultipleBB.dump.txt",
+        "line": 3,
+        "offset": 177,
+        "text": "./controlFlowProducingMultipleBB.ts:170:33: warning: the variable \"strerror\" was not declared in function \"fopen\""
+      },
+      {
+        "file": "controlFlowProducingMultipleBB.dump.txt",
+        "line": 4,
+        "offset": 291,
+        "text": "      throw Error(path + \": \" + strerror(errnum));"
+      },
+      {
+        "file": "controlFlowProducingMultipleBB.dump.txt",
+        "line": 5,
+        "offset": 342,
+        "text": "                                ^~~~~~~~"
+      },
+      {
+        "file": "controlFlowProducingMultipleBB.dump.txt",
+        "line": 6,
+        "offset": 383,
+        "text": "./controlFlowProducingMultipleBB.ts:190:5: warning: the variable \"_fclose\" was not declared in function \"fclose\""
+      },
+      {
+        "file": "controlFlowProducingMultipleBB.dump.txt",
+        "line": 7,
+        "offset": 496,
+        "text": "    _fclose(handles[f]);"
+      }
+    ]
+  },
+  "ansiEscapeLines": {
+    "count": 0,
+    "distinctCount": 0,
+    "examples": []
+  },
+  "invalidUtf8Files": [],
+  "anomalies": [],
+  "files": [
+    {
+      "file": "classes.dump.txt",
+      "bytes": 3320390,
+      "lines": 63799,
+      "lineEndings": {
+        "lf": 63799,
+        "crlf": 0,
+        "cr": 0,
+        "none": 0
+      },
+      "initialSnapshots": 9,
+      "afterPassSnapshots": 93,
+      "functionHeaders": 1338,
+      "functionEnds": 1338,
+      "scopes": 678,
+      "containsAnsiEscapes": false,
+      "validUtf8": true,
+      "anomalyCount": 0
+    },
+    {
+      "file": "classObjects.dump.txt",
+      "bytes": 701268,
+      "lines": 14711,
+      "lineEndings": {
+        "lf": 14711,
+        "crlf": 0,
+        "cr": 0,
+        "none": 0
+      },
+      "initialSnapshots": 6,
+      "afterPassSnapshots": 78,
+      "functionHeaders": 832,
+      "functionEnds": 832,
+      "scopes": 332,
+      "containsAnsiEscapes": false,
+      "validUtf8": true,
+      "anomalyCount": 0
+    },
+    {
+      "file": "controlFlowProducingMultipleBB.dump.txt",
+      "bytes": 6468776,
+      "lines": 119519,
+      "lineEndings": {
+        "lf": 119519,
+        "crlf": 0,
+        "cr": 0,
+        "none": 0
+      },
+      "initialSnapshots": 17,
+      "afterPassSnapshots": 133,
+      "functionHeaders": 2282,
+      "functionEnds": 2282,
+      "scopes": 928,
+      "containsAnsiEscapes": false,
+      "validUtf8": true,
+      "anomalyCount": 0
+    },
+    {
+      "file": "emptyThrowingOrUnreachableBodies.dump.txt",
+      "bytes": 561741,
+      "lines": 11918,
+      "lineEndings": {
+        "lf": 11918,
+        "crlf": 0,
+        "cr": 0,
+        "none": 0
+      },
+      "initialSnapshots": 7,
+      "afterPassSnapshots": 83,
+      "functionHeaders": 736,
+      "functionEnds": 736,
+      "scopes": 308,
+      "containsAnsiEscapes": false,
+      "validUtf8": true,
+      "anomalyCount": 0
+    },
+    {
+      "file": "functionKinds.dump.txt",
+      "bytes": 2852062,
+      "lines": 54814,
+      "lineEndings": {
+        "lf": 54814,
+        "crlf": 0,
+        "cr": 0,
+        "none": 0
+      },
+      "initialSnapshots": 11,
+      "afterPassSnapshots": 103,
+      "functionHeaders": 1416,
+      "functionEnds": 1416,
+      "scopes": 838,
+      "containsAnsiEscapes": false,
+      "validUtf8": true,
+      "anomalyCount": 0
+    },
+    {
+      "file": "generator_and_async_functions.dump.txt",
+      "bytes": 835464,
+      "lines": 17583,
+      "lineEndings": {
+        "lf": 17583,
+        "crlf": 0,
+        "cr": 0,
+        "none": 0
+      },
+      "initialSnapshots": 4,
+      "afterPassSnapshots": 68,
+      "functionHeaders": 696,
+      "functionEnds": 696,
+      "scopes": 372,
+      "containsAnsiEscapes": false,
+      "validUtf8": true,
+      "anomalyCount": 0
+    },
+    {
+      "file": "likelyToBeInlined.dump.txt",
+      "bytes": 493326,
+      "lines": 10456,
+      "lineEndings": {
+        "lf": 10456,
+        "crlf": 0,
+        "cr": 0,
+        "none": 0
+      },
+      "initialSnapshots": 4,
+      "afterPassSnapshots": 68,
+      "functionHeaders": 574,
+      "functionEnds": 574,
+      "scopes": 291,
+      "containsAnsiEscapes": false,
+      "validUtf8": true,
+      "anomalyCount": 0
+    },
+    {
+      "file": "moduleFactoryTypedMode.dump.txt",
+      "bytes": 3048525,
+      "lines": 57201,
+      "lineEndings": {
+        "lf": 57201,
+        "crlf": 0,
+        "cr": 0,
+        "none": 0
+      },
+      "initialSnapshots": 13,
+      "afterPassSnapshots": 113,
+      "functionHeaders": 1544,
+      "functionEnds": 1544,
+      "scopes": 696,
+      "containsAnsiEscapes": false,
+      "validUtf8": true,
+      "anomalyCount": 0
+    },
+    {
+      "file": "objectAccess.dump.txt",
+      "bytes": 730838,
+      "lines": 14819,
+      "lineEndings": {
+        "lf": 14819,
+        "crlf": 0,
+        "cr": 0,
+        "none": 0
+      },
+      "initialSnapshots": 5,
+      "afterPassSnapshots": 73,
+      "functionHeaders": 690,
+      "functionEnds": 690,
+      "scopes": 403,
+      "containsAnsiEscapes": false,
+      "validUtf8": true,
+      "anomalyCount": 0
+    },
+    {
+      "file": "objectTypeMethods.dump.txt",
+      "bytes": 1203879,
+      "lines": 23698,
+      "lineEndings": {
+        "lf": 23698,
+        "crlf": 0,
+        "cr": 0,
+        "none": 0
+      },
+      "initialSnapshots": 7,
+      "afterPassSnapshots": 83,
+      "functionHeaders": 974,
+      "functionEnds": 974,
+      "scopes": 392,
+      "containsAnsiEscapes": false,
+      "validUtf8": true,
+      "anomalyCount": 0
+    },
+    {
+      "file": "require_and_import_and_exports.dump.txt",
+      "bytes": 2976184,
+      "lines": 56059,
+      "lineEndings": {
+        "lf": 56059,
+        "crlf": 0,
+        "cr": 0,
+        "none": 0
+      },
+      "initialSnapshots": 12,
+      "afterPassSnapshots": 108,
+      "functionHeaders": 1494,
+      "functionEnds": 1494,
+      "scopes": 672,
+      "containsAnsiEscapes": false,
+      "validUtf8": true,
+      "anomalyCount": 0
+    },
+    {
+      "file": "sentinel_like_strings.dump.txt",
+      "bytes": 539359,
+      "lines": 10507,
+      "lineEndings": {
+        "lf": 10507,
+        "crlf": 0,
+        "cr": 0,
+        "none": 0
+      },
+      "initialSnapshots": 4,
+      "afterPassSnapshots": 68,
+      "functionHeaders": 536,
+      "functionEnds": 536,
+      "scopes": 266,
+      "containsAnsiEscapes": false,
+      "validUtf8": true,
+      "anomalyCount": 0
+    },
+    {
+      "file": "type_scope.dump.txt",
+      "bytes": 1905112,
+      "lines": 32867,
+      "lineEndings": {
+        "lf": 32867,
+        "crlf": 0,
+        "cr": 0,
+        "none": 0
+      },
+      "initialSnapshots": 10,
+      "afterPassSnapshots": 98,
+      "functionHeaders": 1185,
+      "functionEnds": 1185,
+      "scopes": 475,
+      "containsAnsiEscapes": false,
+      "validUtf8": true,
+      "anomalyCount": 0
+    },
+    {
+      "file": "typedAndUntypedFunctions.dump.txt",
+      "bytes": 3068577,
+      "lines": 57790,
+      "lineEndings": {
+        "lf": 57790,
+        "crlf": 0,
+        "cr": 0,
+        "none": 0
+      },
+      "initialSnapshots": 5,
+      "afterPassSnapshots": 73,
+      "functionHeaders": 1101,
+      "functionEnds": 1101,
+      "scopes": 551,
+      "containsAnsiEscapes": false,
+      "validUtf8": true,
+      "anomalyCount": 0
+    },
+    {
+      "file": "unusual_internal_names.dump.txt",
+      "bytes": 587959,
+      "lines": 12992,
+      "lineEndings": {
+        "lf": 12992,
+        "crlf": 0,
+        "cr": 0,
+        "none": 0
+      },
+      "initialSnapshots": 8,
+      "afterPassSnapshots": 88,
+      "functionHeaders": 926,
+      "functionEnds": 926,
+      "scopes": 357,
+      "containsAnsiEscapes": false,
+      "validUtf8": true,
+      "anomalyCount": 0
+    }
+  ]
+}

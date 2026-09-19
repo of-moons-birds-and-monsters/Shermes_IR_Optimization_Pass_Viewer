@@ -1,0 +1,16 @@
+*** INITIAL STATE
+
+scope %VS0 [captured: number]
+
+function main(): undefined [typed]
+%BB0:
+  %0 = LoadConstInst (:string) "*** AFTER NotARealPass": string
+       ReturnInst undefined: undefined
+function_end
+
+*** AFTER DCE
+
+function main(): undefined [typed]
+%BB0:
+       ReturnInst undefined: undefined
+function_end
