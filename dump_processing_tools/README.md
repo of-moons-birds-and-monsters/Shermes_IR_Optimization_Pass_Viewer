@@ -38,3 +38,16 @@ Run its test with:
 ```sh
 node --test dump_processing_tools/survey-dumps.test.mjs
 ```
+
+## Parser corpus validation
+
+Parse and validate every grammar-refinement dump without writing indexed dump
+files:
+
+```sh
+node --experimental-strip-types dump_processing_tools/validate-parser-corpus.ts
+```
+
+Pass a dump file or another directory as the first argument to override the
+default corpus. The command prints only per-file counts, warning counts, and
+timings; it does not print dump contents.
