@@ -1,121 +1,68 @@
-import { useState } from "react";
-import heroImg from "./assets/hero.png";
-import reactLogo from "./assets/react.svg";
-import viteLogo from "./assets/vite.svg";
 import "./App.css";
+import { IrDiffEditor } from "./Editor";
+import {
+  useFileDialog,
+  type UseFileDialogOptions,
+} from "./hooks/useFileDialog";
+import { buildDumpIndex, type DumpIndex } from "../../src/dump_parser";
+import { useEffect, useState } from "react";
+const before = `function "greet"(name: string): string {
+%BB0:
+  %0 = LoadFrameInst [name]
+  %1 = BinaryOperatorInst '+', "Hello, ", %0
+  ReturnInst %1
+}`;
 
+const after = `function "greet"(name: string): string {
+%BB0:
+  %0 = BinaryOperatorInst '+', "Hello, ", name
+  ReturnInst %0
+}`;
+
+interface AppSettings {
+  useFileDialog: UseFileDialogOptions;
+}
+const appSettings: AppSettings = {
+  useFileDialog: { multiple: false },
+};
 function App() {
-  const [count, setCount] = useState(0);
+  const [files, open, reset] = useFileDialog(appSettings.useFileDialog);
+  const [state, setState] = useState<DumpIndex>();
+  useEffect(() => {
+    if (files) {
+      if (appSettings.useFileDialog.multiple === false && files.length > 1) {
+        throw new Error("Multiple files are not allowed");
+      }
+
+      const file = files[0];
+      file.bytes().then((bytes) => {
+        buildDumpIndex(bytes).then((idx) => {
+          setState(idx);
+          console.log(idx);
+        });
+      });
+    }
+  }, [files]);
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
+    <main className="app">
+      <header className="app__header">
+        <h1>Shermes IR pass viewer</h1>
+        <section className="app__options" aria-label="Options">
+          <button className="app__button" onClick={() => open()}>
+            Open Dump File
+          </button>
+        </section>
+      </header>
+      <header className="app__header app_codeDisplayHeader">
+        <span>Before</span>
+        <span>After</span>
+      </header>
+
+      <section className="app__editor" aria-label="IR comparison">
+        <IrDiffEditor original={before} modified={after} />
       </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+    </main>
   );
 }
 
