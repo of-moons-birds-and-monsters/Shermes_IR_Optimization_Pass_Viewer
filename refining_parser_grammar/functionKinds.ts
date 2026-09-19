@@ -4,7 +4,7 @@ function functionDeclaration(
   bodyId: number,
 ): string {
   for (let i = 0; i < args.length; i++) {
-    args[i] = args[i].replace(/\s/g, "");
+    args[i] = String(args[i]).replace(/\s/g, "");
     args[i] = args[i] + name;
   }
 

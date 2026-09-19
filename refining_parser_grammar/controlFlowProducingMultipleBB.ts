@@ -57,7 +57,7 @@ function calloc(size: number): c_ptr {
   "use unsafe";
 
   let res = _calloc(1, size);
-  if (res === 0) throw Error("OOM");
+  if (res === c_null) throw Error("OOM");
   return res;
 }
 
@@ -67,7 +67,7 @@ function malloc(size: number): c_ptr {
   "use unsafe";
 
   let res = _malloc(size);
-  if (res === 0) throw Error("OOM");
+  if (res === c_null) throw Error("OOM");
   return res;
 }
 
@@ -154,7 +154,7 @@ function throwErrnoAndMsg() {
 /// Very simple hack to ensure safety.
 let handles: c_ptr[] = [];
 // FIXME: fast array doesn't support .pop() yet.
-let closedHandles = Array();
+let closedHandles: Array<c_int> = new Array<c_int>();
 
 function fopen(path: string, mode: string): number {
   "use unsafe";
@@ -171,8 +171,8 @@ function fopen(path: string, mode: string): number {
     }
     // Allocate a handle.
     if (closedHandles.length > 0) {
-      let f = closedHandles.pop();
-      handles[f] = filePtr;
+      let f: any = closedHandles.pop();
+      handles[f as number] = filePtr;
       return f;
     }
     handles.push(filePtr);

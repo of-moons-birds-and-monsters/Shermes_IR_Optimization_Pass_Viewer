@@ -11,9 +11,11 @@ class Walker {
     this.childrenWalked = 0;
     this.isBeingWalked = false;
   }
+  @Hermes.final
   get isBeingWalked(): boolean {
     return this._isBeingWalked;
   }
+  @Hermes.final
   set isBeingWalked(value: boolean) {
     this._isBeingWalked = value;
   }
