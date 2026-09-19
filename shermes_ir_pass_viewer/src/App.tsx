@@ -37,6 +37,7 @@ type SideSelectorProps = {
   active: boolean;
   onActivate: () => void;
   onChange: (selection: Selection) => void;
+  matchOtherSide: () => void;
 };
 
 function SideSelector({
@@ -46,8 +47,8 @@ function SideSelector({
   active,
   onActivate,
   onChange,
+  matchOtherSide,
 }: SideSelectorProps) {
-  const [collapsed, setCollapsed] = useState(false);
   const selectedEntry = getTimelineEntry(index, selection);
 
   const changeFunction = (functionId: string) => {
@@ -65,6 +66,9 @@ function SideSelector({
     >
       <header className="side-selector__heading">
         <h2>{side === "before" ? "Before" : "After"}</h2>
+        <button onClick={() => matchOtherSide()}>
+          Match {side === "before" ? "After" : "Before"}
+        </button>
       </header>
 
       <div className="side-selector__content">
@@ -245,7 +249,18 @@ function App() {
     setBefore(nextDifferenceSelections.before);
     setAfter(nextDifferenceSelections.after);
   };
+  // NOTE: do not memoize these objects, or else this breaks and risks stale data.
+  const matchAfter = () =>
+    setBefore({
+      functionId: after!.functionId,
+      snapshotId: before!.snapshotId,
+    });
 
+  const matchBefore = () =>
+    setAfter({
+      functionId: before!.functionId,
+      snapshotId: after!.snapshotId,
+    });
   return (
     <main className="app">
       <header className="app__header">
@@ -289,6 +304,7 @@ function App() {
                   active={activeSide === "before"}
                   onActivate={() => setActiveSide("before")}
                   onChange={setBefore}
+                  matchOtherSide={matchAfter}
                 />
                 <SideSelector
                   side="after"
@@ -297,6 +313,7 @@ function App() {
                   active={activeSide === "after"}
                   onActivate={() => setActiveSide("after")}
                   onChange={setAfter}
+                  matchOtherSide={matchBefore}
                 />
               </>
             )}
