@@ -1,0 +1,156 @@
+# Shermes IR Pass Viewer — Decision Map
+
+## Direction already chosen
+
+Build the first version as a local web application in TypeScript, using Monaco's
+diff editor. Keep dump parsing and indexing in a UI-independent TypeScript
+package with a versioned JSON output format. The application should accept an
+existing `-Xdump-between-passes` dump before it learns to invoke Shermes itself.
+
+This gives the primary UI a searchable function list, ordered pass timeline,
+and both inline and side-by-side diffs without committing the core to one
+editor. A later Neovim adapter can invoke the same CLI and open extracted
+versions in native diff buffers. Do not start with Electron, Tauri, an LSP, or a
+native C/C++ GUI.
+
+The initial display is a textual IR diff. “Overlay” means a unified/inline diff
+that interleaves deletions and additions, not two translucent texts drawn over
+one another.
+
+The dump format observed in the current debug compiler has these constraints:
+
+- output is written to stderr;
+- snapshots begin with `*** INITIAL STATE` or `*** AFTER <pass>`;
+- another `INITIAL STATE` starts another pipeline stage;
+- pass names can repeat, so snapshot identity must include stage and ordinal;
+- functions are delimited by a `function ...` header and `function_end`;
+- functions can disappear, become unreachable, or have duplicate/anonymous
+  display names.
+
+## 1. Define reliable snapshot and function identity
+
+**Blocked by:** Nothing
+
+**Type:** Prototype
+
+**Question:** Can a streaming parser consistently recover stages, snapshots,
+scopes, and the same logical function across all Shermes pipelines, including
+anonymous or duplicate names and removed functions?
+
+**Answer:** Build the parser first and exercise it against several real dumps.
+Use `(stage ordinal, snapshot ordinal)` for snapshots. Initially identify a
+function with a canonicalized header plus its occurrence ordinal within the
+stage, while retaining its raw header, scope, source location if present, and
+body. Record absence explicitly and hash bodies so unchanged snapshots can be
+collapsed. If this heuristic is ambiguous in real programs, investigate adding
+a stable function identifier to Shermes's dump output instead of growing a
+complex fuzzy matcher.
+
+Success means fixtures cover repeated pass names, repeated `INITIAL STATE`,
+duplicate names, unreachable functions, and removal.
+
+## 2. Establish the core interchange model
+
+**Blocked by:** 1
+
+**Type:** Discuss
+
+**Question:** What is the smallest interface that supports the web UI and later
+editor integrations without turning the tool into a daemon or language server?
+
+**Answer:** Define a versioned `DumpIndex` JSON schema containing stages,
+ordered snapshots, function identities, versions or source ranges, body hashes,
+and non-IR diagnostic chunks. Expose it through a TypeScript library and a CLI.
+Start by embedding function text; measure representative large dumps before
+adding lazy file ranges or deduplicated body storage.
+
+## 3. Prototype the function-history UI
+
+**Blocked by:** 1, 2
+
+**Type:** Prototype
+
+**Question:** Which controls make optimizer-caused changes and removals quickest
+to locate?
+
+**Answer:** Prototype one screen with:
+
+- a searchable function list with present/removed status;
+- selectors for snapshots A and B, grouped by pipeline stage;
+- a function timeline marking changed, unchanged, unreachable, and absent;
+- previous/next change navigation and an “only changed snapshots” toggle;
+- Monaco inline and side-by-side diff modes;
+- an explicit removal banner with an empty comparison model when one side is
+  absent.
+
+Validate the workflow on the typed-class inlining failure before adding visual
+polish.
+
+## 4. Separate compiler output from diagnostics
+
+**Blocked by:** 1, 2
+
+**Type:** Prototype
+
+**Question:** After file import works, how should the tool invoke Shermes when
+IR snapshots and compiler diagnostics share stderr?
+
+**Answer:** Add a runner as a second milestone. Capture stdout and stderr,
+recognize snapshot boundaries in stderr, preserve text outside parsed regions
+as diagnostics, record the exact compiler path and arguments, and never require
+successful code generation to inspect a partial dump. Avoid shell command
+construction; spawn the compiler with an argument array.
+
+## 5. Decide how much IR awareness the diff needs
+
+**Blocked by:** 3
+
+**Type:** Research
+
+**Question:** Is a raw line/word diff sufficient, or do SSA renumbering and
+block movement make meaningful changes too noisy?
+
+**Answer:** Ship raw textual diff first. Then test an optional normalized view
+that can canonicalize mechanically renamed values without replacing the exact
+view. Add lightweight Shermes IR syntax highlighting through a custom Monaco
+tokenizer only after navigation and diffing work. Structural/difftastic-style
+IR comparison requires a real grammar and is outside the first version.
+
+## 6. Evaluate editor adapters
+
+**Blocked by:** 2, 3
+
+**Type:** Discuss
+
+**Question:** Does the validated workflow benefit enough from living inside an
+editor to justify an adapter?
+
+**Answer:** Revisit after the standalone UI is useful. A Neovim adapter should
+call the CLI, present function/pass pickers, and put two extracted versions in
+scratch diff buffers; it should not duplicate parsing. A VS Code extension may
+reuse the TypeScript core and Monaco UI. Keep both optional rather than making
+either editor the owner of the data model.
+
+## 7. Choose packaging after measuring the prototype
+
+**Blocked by:** 3, 4
+
+**Type:** Discuss
+
+**Question:** Is a static browser app sufficient, or is a local CLI/server
+needed for compiler invocation and large-file access?
+
+**Answer:** Use Vite for development and browser file import initially. Once
+compiler invocation is added, package a small Node CLI/local server around the
+same core. Consider a desktop wrapper only if browser security or distribution
+becomes a demonstrated problem.
+
+## Proposed delivery order
+
+1. Parser fixtures and `DumpIndex` CLI.
+2. Read-only web viewer with function history and two-snapshot diff.
+3. Removal/unreachable/change navigation.
+4. Shermes invocation and diagnostics panel.
+5. Optional IR highlighting and normalized diff experiments.
+6. Neovim or VS Code adapter based on actual usage.
+
