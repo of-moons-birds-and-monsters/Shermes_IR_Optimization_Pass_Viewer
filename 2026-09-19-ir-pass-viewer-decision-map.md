@@ -124,6 +124,13 @@ code-unit offsets into the decoded `dump.text`, matching JavaScript's
 Store a SHA-256 digest of the decoded backing text so ranges can be validated
 if an external-document storage mode is added later.
 
+Range offsets are zero-based and half-open: `start` is included and `end` is
+excluded. Preserve `dump.text` exactly as emitted after decoding; in particular,
+do not normalize `LF`, `CRLF`, or lone `CR` line endings. The initial schema
+does not persist line and column positions. The editor may build a line-start
+index and derive zero-based lines and UTF-16 columns for display and navigation
+later.
+
 A preliminary shape is:
 
 ```ts
