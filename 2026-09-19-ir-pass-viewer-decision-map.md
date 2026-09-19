@@ -263,18 +263,18 @@ do not construct a Shermes invocation, interpret compiler flags, or require a
 successful compiler exit.
 
 An ordinary browser page cannot execute local processes. The generic runner
-therefore belongs to the optional local Node host/backend, not the browser UI
-itself. The host can use the platform shell (`$SHELL -lc` on the initial Unix
-target), stream stdout and stderr to separate UI panes, retain the exit status,
-and allow either captured stream or a subsequently imported file to become the
-dump document. If the user redirects output in the command, such as with Bash
-`&>`, they can import the resulting file.
+therefore belongs to a later native/local host, not the initial browser UI. A
+Tauri host can use the platform shell (`$SHELL -lc` on the initial Unix target),
+stream stdout and stderr to separate UI panes, retain the exit status, and
+allow either captured stream or a subsequently imported file to become the dump
+document. If the user redirects output in the command, such as with Bash `&>`,
+they can import the resulting file.
 
 This input deliberately permits arbitrary shell execution, so it must require
-an explicit Run action and must never be exposed through an unauthenticated
-network listener. Bind the local host to loopback and use a per-launch token if
-the browser communicates with it over HTTP. Display the exact command and
-working directory with each captured run as provenance.
+an explicit Run action. If any future implementation exposes execution through
+a local HTTP service instead of Tauri IPC, it must bind to loopback and require
+a per-launch token. Display the exact command and working directory with each
+captured run as provenance.
 
 ## 5. Decide how much IR awareness the diff needs
 
@@ -282,14 +282,26 @@ working directory with each captured run as provenance.
 
 **Type:** Research
 
-**Question:** Is a raw line/word diff sufficient, or do SSA renumbering and
-block movement make meaningful changes too noisy?
+**Question:** What comparison and highlighting should the initial viewer use?
 
-**Answer:** Ship raw textual diff first. Then test an optional normalized view
-that can canonicalize mechanically renamed values without replacing the exact
-view. Add lightweight Shermes IR syntax highlighting through a custom Monaco
-tokenizer only after navigation and diffing work. Structural/difftastic-style
-IR comparison requires a real grammar and is outside the first version.
+**Answer:** Use only an exact raw textual line/word diff initially. Do not
+normalize SSA numbers, reorder blocks, or attempt a structural IR comparison
+until real usage demonstrates a specific source of noise. The raw view remains
+available permanently even if normalized modes are explored later.
+
+Monaco's diff highlighting supplies the required change visualization
+independently of IR syntax highlighting. Add syntax coloring later as a purely
+visual layer that never changes the compared text. First try an existing LLVM
+IR/TextMate-style grammar and judge its output against representative Shermes
+IR. Neovim's `.ll` highlighting shows that a generic LLVM interpretation can
+already be useful, but Monaco will not inherit Neovim's filename detection or
+grammar automatically. If LLVM highlighting is misleading or awkward to
+integrate, register a small Monaco tokenizer for stable lexical categories such
+as strings, `%` identifiers, block labels, numbers, booleans, types, function
+headers, and instruction names. Full Shermes grammar accuracy is not required
+for this feature.
+
+Structural/difftastic-style IR comparison remains outside the first version.
 
 ## 6. Evaluate editor adapters
 
@@ -312,19 +324,24 @@ either editor the owner of the data model.
 
 **Type:** Discuss
 
-**Question:** Is a static browser app sufficient, or is a local CLI/server
-needed for compiler invocation and large-file access?
+**Question:** What should host the initial UI, and where should desktop
+packaging enter?
 
-**Answer:** Use Vite for development and browser file import initially. Once
-compiler invocation is added, package a small Node CLI/local server around the
-same core. Consider a desktop wrapper only if browser security or distribution
-becomes a demonstrated problem.
+**Answer:** A browser application is sufficient for the initial viewer. Use
+Vite for development, local file import, parsing, timelines, and Monaco diffs.
+Do not require a local server or desktop runtime for the first version.
+
+Tauri is the preferred later desktop direction once there is a useful browser
+UI to wrap. It can provide native file access and the optional generic command
+runner from step 4. Revisit packaging only after the browser workflow is
+working; do not make Tauri a prerequisite for parser or UI development.
 
 ## Proposed delivery order
 
 1. Parser fixtures and `DumpIndex` CLI.
 2. Read-only web viewer with function history and two-snapshot diff.
 3. Removal/unreachable/change navigation.
-4. Shermes invocation and diagnostics panel.
-5. Optional IR highlighting and normalized diff experiments.
-6. Neovim or VS Code adapter based on actual usage.
+4. Primitive IR syntax highlighting, using an LLVM grammar if suitable.
+5. Optional Tauri packaging and generic command runner.
+6. Normalized diff experiments only in response to observed diff noise.
+7. Neovim or VS Code adapter based on actual usage.
