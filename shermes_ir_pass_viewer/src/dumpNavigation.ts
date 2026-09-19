@@ -59,7 +59,9 @@ export function timelineFor(
       .filter((version) => version.functionId === functionId)
       .map((version) => [version.snapshotId, version]),
   );
+  const priorModuleState = moduleStateBeforeTrace(index, trace, functionId);
   let previouslyPresent = false;
+  let previouslyRemoved = priorModuleState === "removed";
 
   return trace.snapshots.map((snapshot, snapshotIndex) => {
     const version = versionBySnapshot.get(snapshot.id);
@@ -76,7 +78,11 @@ export function timelineFor(
         ? "unchanged"
         : "changed";
     } else if (version) {
-      if (trace.scope.kind === "module" && previouslyPresent) {
+      if (
+        trace.scope.kind === "module"
+        && snapshotIndex > 0
+        && (previouslyRemoved || previouslyPresent)
+      ) {
         status = "unknown";
       } else if (trace.scope.kind === "module" && snapshotIndex > 0) {
         status = "introduced";
@@ -85,15 +91,53 @@ export function timelineFor(
       }
     } else if (trace.scope.kind === "module" && previouslyPresent) {
       status = "removed";
+    } else if (trace.scope.kind === "module" && previouslyRemoved) {
+      status = "removed";
     } else {
       status = "unavailable";
     }
 
     if (version) {
       previouslyPresent = true;
+      previouslyRemoved = false;
+    } else if (status === "removed") {
+      previouslyPresent = false;
+      previouslyRemoved = true;
     }
     return { snapshot, version, status };
   });
+}
+
+function moduleStateBeforeTrace(
+  index: DumpIndex,
+  targetTrace: TraceSegment,
+  functionId: string,
+): "removed" | "unknown" {
+  let state: "removed" | "unknown" = "unknown";
+  const snapshotsWithFunction = new Set(
+    index.functionVersions
+      .filter((version) => version.functionId === functionId)
+      .map((version) => version.snapshotId),
+  );
+
+  for (const trace of index.traceSegments) {
+    if (trace.id === targetTrace.id) {
+      break;
+    }
+    if (trace.scope.kind !== "module") {
+      continue;
+    }
+    let presentInThisTrace = false;
+    for (const snapshot of trace.snapshots) {
+      if (snapshotsWithFunction.has(snapshot.id)) {
+        presentInThisTrace = true;
+        state = "unknown";
+      } else if (presentInThisTrace) {
+        state = "removed";
+      }
+    }
+  }
+  return state;
 }
 
 export function findTraceForSnapshot(
@@ -161,4 +205,31 @@ export function snapshotForFunctionChange(
   return side === "before"
     ? versions[0]?.snapshotId
     : versions.at(-1)?.snapshotId;
+}
+
+export function advanceSelectionsTogether(
+  index: DumpIndex,
+  before: Selection,
+  after: Selection,
+): { before: Selection; after: Selection } | undefined {
+  const beforeTrace = findTraceForSnapshot(index, before.snapshotId);
+  const afterTrace = findTraceForSnapshot(index, after.snapshotId);
+  if (!beforeTrace || beforeTrace.id !== afterTrace?.id) {
+    return undefined;
+  }
+  const beforePosition = beforeTrace.snapshots.findIndex(
+    (snapshot) => snapshot.id === before.snapshotId,
+  );
+  const afterPosition = beforeTrace.snapshots.findIndex(
+    (snapshot) => snapshot.id === after.snapshotId,
+  );
+  const nextBefore = beforeTrace.snapshots[beforePosition + 1];
+  const nextAfter = beforeTrace.snapshots[afterPosition + 1];
+  if (!nextBefore || !nextAfter) {
+    return undefined;
+  }
+  return {
+    before: { ...before, snapshotId: nextBefore.id },
+    after: { ...after, snapshotId: nextAfter.id },
+  };
 }

@@ -215,10 +215,14 @@ because that pass made no changes. Therefore:
 - **unreachable** remains a present function whose emitted body says it is
   unreachable.
 
-Do not infer removal by flattening all trace segments into one sequence. A
-function absent from another function's trace is merely unavailable. Under the
-current dumping behavior, a stable function identity should not have a
-present/absent/present gap within one trace. If a fixture violates that
+Do not infer a new removal merely by flattening all trace segments into one
+sequence. A function absent from another function's trace is merely
+unavailable. Module pass managers do run sequentially over the same module,
+however, so a removal already established in one module-scoped trace remains
+removed in later module-scoped traces until the function is observed again.
+Do not carry that conclusion into a function-scoped or unknown-scoped trace.
+Under the current dumping behavior, a stable function identity should not have
+a present/absent/present gap within one trace. If a fixture violates that
 invariant, preserve the unknown state and report a parser warning rather than
 silently calling the gap unchanged.
 

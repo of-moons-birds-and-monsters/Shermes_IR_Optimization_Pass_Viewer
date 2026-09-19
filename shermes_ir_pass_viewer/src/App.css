@@ -57,6 +57,14 @@
   background: #194b33;
 }
 
+.timeline button:disabled {
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .app__error,
 .app__empty {
   margin: 1rem;
@@ -237,7 +245,8 @@
 
 .app__editor {
   flex: 1 1 auto;
-  min-height: 308rem;
+  height: 800px;
+  min-height: 800px;
 }
 
 @media (max-width: 900px) {

@@ -7,6 +7,7 @@ import {
 } from "./hooks/useFileDialog";
 import { buildDumpIndex, type DumpIndex } from "../../src/dump_parser";
 import {
+  advanceSelectionsTogether,
   defaultSelections,
   findTraceForSnapshot,
   functionText,
@@ -175,6 +176,10 @@ function App() {
     () => (index && after ? getTimelineEntry(index, after) : undefined),
     [index, after],
   );
+  const beforeTrace =
+    index && before ? findTraceForSnapshot(index, before.snapshotId) : undefined;
+  const afterTrace =
+    index && after ? findTraceForSnapshot(index, after.snapshotId) : undefined;
   const activeSelection = activeSide === "before" ? before : after;
   const activeTrace =
     index && activeSelection
@@ -199,6 +204,20 @@ function App() {
     );
     const next = timeline[current + offset];
     if (next) selectTimelineEntry(next);
+  };
+
+  const selectionsShareTrace = Boolean(
+    beforeTrace && beforeTrace.id === afterTrace?.id,
+  );
+  const nextSelections =
+    index && before && after
+      ? advanceSelectionsTogether(index, before, after)
+      : undefined;
+
+  const advanceBoth = () => {
+    if (!nextSelections) return;
+    setBefore(nextSelections.before);
+    setAfter(nextSelections.after);
   };
 
   return (
@@ -249,6 +268,11 @@ function App() {
                   Previous snapshot
                 </button>
                 <button onClick={() => stepTimeline(1)}>Next snapshot</button>
+                {selectionsShareTrace && (
+                  <button disabled={!nextSelections} onClick={advanceBoth}>
+                    Advance both
+                  </button>
+                )}
               </div>
             </div>
             <div className="timeline__track">
