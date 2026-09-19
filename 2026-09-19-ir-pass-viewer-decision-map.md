@@ -88,11 +88,87 @@ unreachable functions, and removal.
 **Question:** What is the smallest interface that supports the web UI and later
 editor integrations without turning the tool into a daemon or language server?
 
-**Answer:** Define a versioned `DumpIndex` JSON schema containing stages,
-ordered snapshots, function identities, versions or source ranges, body hashes,
-and non-IR diagnostic chunks. Expose it through a TypeScript library and a CLI.
-Start by embedding function text; measure representative large dumps before
-adding lazy file ranges or deduplicated body storage.
+**Answer:** Define a versioned `DumpIndex` JSON schema and expose it through a
+TypeScript library and CLI. The schema version belongs to the viewer format; it
+must not be derived from the Shermes release or commit. Increment it only when
+the meaning or shape of `DumpIndex` changes incompatibly. Record the Shermes
+build separately as producer provenance, using all information available:
+
+- the compiler's reported version (currently `Static Hermes JS Compiler
+  v0.0` in the checked build);
+- an optional exact source commit;
+- an optional `git describe` string, including a dirty marker;
+- an optional compiler-binary SHA-256, which distinguishes different dirty or
+  differently configured builds from the same source commit;
+- the compiler invocation and relevant flags;
+- the parser/viewer package version.
+
+Release versions and commits are complementary metadata rather than a dual
+schema version. Imported dumps may lack some or all compiler provenance, so
+these fields must be optional. A commit identifies the exact source tree when
+known; a release/tag is a human-readable label. Neither says that the dump
+grammar changed. If Shermes later publishes an explicit dump-format version,
+record that as another producer field.
+
+Store the original dump once as an embedded backing document and refer to its
+contents using half-open text ranges. Function versions, whole snapshots, and
+diagnostic chunks should carry ranges into that backing text instead of
+duplicating their contents. This preserves the complete dump if the original
+file is deleted, retains otherwise-unparsed text, and lets the UI materialize
+only the selected function bodies.
+
+For the TypeScript-first implementation, define offsets explicitly as UTF-16
+code-unit offsets into the decoded `dump.text`, matching JavaScript's
+`String.prototype.slice`. Name these fields `dumpRange` or `textRange`, not
+`sourceRange`, to avoid confusion with source-code locations printed in the IR.
+Store a SHA-256 digest of the decoded backing text so ranges can be validated
+if an external-document storage mode is added later.
+
+A preliminary shape is:
+
+```ts
+type DumpIndex = {
+  schemaVersion: 1;
+  producer: {
+    parserVersion: string;
+    compiler?: {
+      reportedVersion?: string;
+      sourceCommit?: string;
+      gitDescribe?: string;
+      dirty?: boolean;
+      binarySha256?: string;
+      invocation?: string[];
+    };
+  };
+  dump: {
+    text: string;
+    sha256: string;
+    rangeEncoding: "utf16-code-unit";
+  };
+  traceSegments: TraceSegment[];
+  functions: FunctionIdentity[];
+  functionVersions: FunctionVersion[];
+  diagnostics: TextRange[];
+};
+
+type TextRange = {
+  start: number;
+  end: number;
+};
+
+type FunctionVersion = {
+  functionId: string;
+  snapshotId: string;
+  dumpRange: TextRange;
+  bodyHash: string;
+};
+```
+
+This is a logical draft, not yet the final normalized layout. Measure real large
+dumps before adding compression, external-file references, byte-oriented
+ranges, or body deduplication. Those storage strategies can be introduced as a
+new discriminated backing-document representation without changing the
+function-history model.
 
 ## 3. Prototype the function-history UI
 
