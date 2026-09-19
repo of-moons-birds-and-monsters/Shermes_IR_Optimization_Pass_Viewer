@@ -47,16 +47,37 @@ anonymous or duplicate names and removed functions?
 Use `(trace-segment ordinal, pass-invocation ordinal)` for snapshots, retaining
 the displayed pass name as a label. A trace segment starts at `INITIAL STATE`
 and continues through its following `AFTER` dumps. Initially identify a
-function with a canonicalized header plus its occurrence ordinal, while
-retaining its raw header, scope, source location if present, and body. Record
+function by the unique internal function name already printed in its header,
+while retaining its complete raw header, definition kind, scope, source
+location if present, and body. Do not use the complete header as identity,
+because inferred types or attributes in it may change between passes. Record
 absence explicitly and hash bodies so unchanged snapshots can be collapsed.
-If this heuristic is ambiguous in real programs, investigate adding a stable
-function identifier to Shermes's dump output instead of growing a complex
-fuzzy matcher.
+
+Shermes already creates a persistent `irdumper::Namer` on `Context` when
+`-Xdump-between-passes` is active. Its per-function state is keyed by
+`Function *`, while instruction and basic-block labels are keyed by their
+pointers and retained across dump generations. Consequently, a surviving IR
+object normally keeps its printed number between passes. Function headers use
+`Function::internalName_`, which `Module::deriveUniqueInternalName()` makes
+unique for the module and which remains attached to the surviving `Function`.
+This should be sufficient for the viewer without patching Shermes.
+
+Treat printed instruction and basic-block numbers as stable display labels,
+not globally reliable semantic identities: deleted objects leave pointer-keyed
+namer entries temporarily, and allocator address reuse can theoretically make
+a new same-kind object inherit an old number. The current namer also does not
+print an analogous numeric ID for a `Function`.
+
+Only if real fixtures show internal names becoming ambiguous should we patch
+Shermes. The smallest maintainable patch would add an explicit machine-readable
+function identity to dump headers at the printing seam, without changing the
+IR or optimizer. Keep that patch isolated so it can be reapplied to new
+Shermes revisions. Do not build fuzzy cross-pass matching first.
 
 Success means fixtures cover a repeated pass within one module-level trace,
 the same pass sequence across separate per-function traces, repeated
-`INITIAL STATE`, duplicate names, unreachable functions, and removal.
+`INITIAL STATE`, duplicate source-level names with distinct internal names,
+unreachable functions, and removal.
 
 ## 2. Establish the core interchange model
 
