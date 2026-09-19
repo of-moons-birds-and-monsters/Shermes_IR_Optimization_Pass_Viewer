@@ -233,3 +233,56 @@ export function advanceSelectionsTogether(
     after: { ...after, snapshotId: nextAfter.id },
   };
 }
+
+export function advanceSelectionsToNextDifference(
+  index: DumpIndex,
+  before: Selection,
+  after: Selection,
+): { before: Selection; after: Selection } | undefined {
+  const trace = findTraceForSnapshot(index, before.snapshotId);
+  const afterTrace = findTraceForSnapshot(index, after.snapshotId);
+  if (!trace || trace.id !== afterTrace?.id) {
+    return undefined;
+  }
+  const beforePosition = trace.snapshots.findIndex(
+    (snapshot) => snapshot.id === before.snapshotId,
+  );
+  const afterPosition = trace.snapshots.findIndex(
+    (snapshot) => snapshot.id === after.snapshotId,
+  );
+  const versionByFunctionAndSnapshot = new Map(
+    index.functionVersions
+      .filter(
+        (version) =>
+          version.functionId === before.functionId
+          || version.functionId === after.functionId,
+      )
+      .map((version) => [
+        `${version.functionId}\0${version.snapshotId}`,
+        version,
+      ]),
+  );
+
+  for (let offset = 1; ; offset += 1) {
+    const nextBefore = trace.snapshots[beforePosition + offset];
+    const nextAfter = trace.snapshots[afterPosition + offset];
+    if (!nextBefore || !nextAfter) {
+      return undefined;
+    }
+    const beforeVersion = versionByFunctionAndSnapshot.get(
+      `${before.functionId}\0${nextBefore.id}`,
+    );
+    const afterVersion = versionByFunctionAndSnapshot.get(
+      `${after.functionId}\0${nextAfter.id}`,
+    );
+    if (
+      beforeVersion?.contentSha256 !== afterVersion?.contentSha256
+      || Boolean(beforeVersion) !== Boolean(afterVersion)
+    ) {
+      return {
+        before: { ...before, snapshotId: nextBefore.id },
+        after: { ...after, snapshotId: nextAfter.id },
+      };
+    }
+  }
+}

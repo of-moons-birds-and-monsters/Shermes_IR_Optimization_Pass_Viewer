@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { buildDumpIndex } from "./dump_parser.ts";
 import {
+  advanceSelectionsToNextDifference,
   advanceSelectionsTogether,
   timelineFor,
   type Selection,
@@ -69,4 +70,28 @@ test("advances both selections by one ordinal while preserving their gap", async
     snapshotId: snapshots[3].id,
   });
   assert.equal(atEnd, undefined);
+});
+
+test("advances both selections to the next pair with different contents", async () => {
+  const dump = [
+    "*** INITIAL STATE", "", fn("target", "0"), "",
+    "*** AFTER A", "", fn("target", "0"), "",
+    "*** AFTER B", "", fn("target", "0"), "",
+    "*** AFTER C", "", fn("target", "1"), "",
+    "*** AFTER D", "", fn("target", "1"), "",
+  ].join("\n");
+  const index = await buildDumpIndex(encoder.encode(dump));
+  const target = index.functions[0];
+  const snapshots = index.traceSegments[0].snapshots;
+  const before: Selection = { functionId: target.id, snapshotId: snapshots[0].id };
+  const after: Selection = { functionId: target.id, snapshotId: snapshots[1].id };
+
+  const advanced = advanceSelectionsToNextDifference(index, before, after);
+  assert.equal(advanced?.before.snapshotId, snapshots[2].id);
+  assert.equal(advanced?.after.snapshotId, snapshots[3].id);
+
+  assert.equal(
+    advanceSelectionsToNextDifference(index, advanced!.before, advanced!.after),
+    undefined,
+  );
 });

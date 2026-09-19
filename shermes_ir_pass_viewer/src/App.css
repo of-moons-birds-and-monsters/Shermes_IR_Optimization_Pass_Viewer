@@ -42,6 +42,7 @@
 }
 
 .app__button,
+.side-selector button,
 .timeline button {
   border: 1px solid var(--gold);
   border-radius: 0.35rem;
@@ -52,6 +53,7 @@
 }
 
 .app__button:hover,
+.side-selector button:hover,
 .timeline button:hover {
   border-color: var(--yellow);
   background: #194b33;
@@ -87,9 +89,6 @@
 }
 
 .side-selector {
-  display: grid;
-  grid-template-columns: minmax(10rem, 1fr) minmax(12rem, 1.6fr);
-  gap: 0.65rem;
   margin: 0;
   padding: 0.65rem;
   border: 1px solid var(--border);
@@ -102,22 +101,36 @@
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--gold), transparent 45%);
 }
 
-.side-selector legend {
-  padding: 0 0.35rem;
+.side-selector__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.side-selector__heading h2 {
+  margin: 0;
   color: var(--yellow);
   font-size: 0.8rem;
   font-weight: 700;
   text-transform: uppercase;
 }
 
-.side-selector label {
+.side-selector__content {
+  display: grid;
+  grid-template-columns: minmax(10rem, 1fr) minmax(12rem, 1.6fr);
+  gap: 0.65rem;
+  margin-top: 0.65rem;
+}
+
+.side-selector__content label {
   display: grid;
   gap: 0.25rem;
   color: var(--muted);
   font-size: 0.72rem;
 }
 
-.side-selector select {
+.side-selector__content select {
   width: 100%;
   min-width: 0;
   padding: 0.4rem;
@@ -171,7 +184,15 @@
 }
 
 .timeline__navigation {
+  display: flex;
+  gap: 0.45rem;
   flex-shrink: 0;
+}
+
+.timeline__heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
 }
 
 .timeline__track {
@@ -231,7 +252,8 @@
   border-color: var(--red);
 }
 
-.timeline__entry--selected .timeline__marker {
+.timeline__entry--comparison-selected .timeline__marker {
+  border-color: var(--green);
   background: var(--yellow);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--yellow), transparent 70%);
 }
@@ -254,7 +276,7 @@
     grid-template-columns: 1fr;
   }
 
-  .side-selector {
+  .side-selector__content {
     grid-template-columns: 1fr;
   }
 

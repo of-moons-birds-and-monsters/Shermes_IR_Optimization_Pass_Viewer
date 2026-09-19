@@ -7,6 +7,7 @@ import {
 } from "./hooks/useFileDialog";
 import { buildDumpIndex, type DumpIndex } from "../../src/dump_parser";
 import {
+  advanceSelectionsToNextDifference,
   advanceSelectionsTogether,
   defaultSelections,
   findTraceForSnapshot,
@@ -46,6 +47,7 @@ function SideSelector({
   onActivate,
   onChange,
 }: SideSelectorProps) {
+  const [collapsed, setCollapsed] = useState(false);
   const selectedEntry = getTimelineEntry(index, selection);
 
   const changeFunction = (functionId: string) => {
@@ -56,51 +58,60 @@ function SideSelector({
   };
 
   return (
-    <fieldset
+    <section
       className={`side-selector${active ? " side-selector--active" : ""}`}
       onFocus={onActivate}
       onClick={onActivate}
     >
-      <legend>{side === "before" ? "Before" : "After"}</legend>
-      <label>
-        Function
-        <select
-          value={selection.functionId}
-          onChange={(event) => changeFunction(event.target.value)}
-        >
-          {index.functions.map((identity) => (
-            <option key={identity.id} value={identity.id}>
-              {identity.internalName || "(anonymous)"}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Snapshot
-        <select
-          value={selection.snapshotId}
-          onChange={(event) =>
-            onChange({ ...selection, snapshotId: event.target.value })
-          }
-        >
-          {index.traceSegments.map((trace) => (
-            <optgroup key={trace.id} label={traceLabel(trace)}>
-              {timelineFor(index, trace, selection.functionId).map((entry) => (
-                <option key={entry.snapshot.id} value={entry.snapshot.id}>
-                  {entry.snapshot.ordinal + 1}. {snapshotLabel(entry.snapshot)}{" "}
-                  · {entry.status}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
-      </label>
-      {selectedEntry && (
-        <div className={`status-banner status-banner--${selectedEntry.status}`}>
-          {statusMessage(selectedEntry)}
-        </div>
-      )}
-    </fieldset>
+      <header className="side-selector__heading">
+        <h2>{side === "before" ? "Before" : "After"}</h2>
+      </header>
+
+      <div className="side-selector__content">
+        <label>
+          Function
+          <select
+            value={selection.functionId}
+            onChange={(event) => changeFunction(event.target.value)}
+          >
+            {index.functions.map((identity) => (
+              <option key={identity.id} value={identity.id}>
+                {identity.internalName || "(anonymous)"}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Snapshot
+          <select
+            value={selection.snapshotId}
+            onChange={(event) =>
+              onChange({ ...selection, snapshotId: event.target.value })
+            }
+          >
+            {index.traceSegments.map((trace) => (
+              <optgroup key={trace.id} label={traceLabel(trace)}>
+                {timelineFor(index, trace, selection.functionId).map(
+                  (entry) => (
+                    <option key={entry.snapshot.id} value={entry.snapshot.id}>
+                      {entry.snapshot.ordinal + 1}.{" "}
+                      {snapshotLabel(entry.snapshot)} · {entry.status}
+                    </option>
+                  ),
+                )}
+              </optgroup>
+            ))}
+          </select>
+        </label>
+        {selectedEntry && (
+          <div
+            className={`status-banner status-banner--${selectedEntry.status}`}
+          >
+            {statusMessage(selectedEntry)}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -133,6 +144,8 @@ function App() {
   const [activeSide, setActiveSide] = useState<ComparisonSide>("after");
   const [fileName, setFileName] = useState<string>();
   const [error, setError] = useState<string>();
+  const [timelineCollapsed, setTimelineCollapsed] = useState(false);
+  const [sideSelectorsCollapsed, setSideSelectorsCollapsed] = useState(false);
 
   useEffect(() => {
     const file = files?.[0];
@@ -177,7 +190,9 @@ function App() {
     [index, after],
   );
   const beforeTrace =
-    index && before ? findTraceForSnapshot(index, before.snapshotId) : undefined;
+    index && before
+      ? findTraceForSnapshot(index, before.snapshotId)
+      : undefined;
   const afterTrace =
     index && after ? findTraceForSnapshot(index, after.snapshotId) : undefined;
   const activeSelection = activeSide === "before" ? before : after;
@@ -216,8 +231,19 @@ function App() {
 
   const advanceBoth = () => {
     if (!nextSelections) return;
-    setBefore(nextSelections.before);
+
     setAfter(nextSelections.after);
+    setBefore(nextSelections.before);
+  };
+
+  const advanceToNextDifference = () => {
+    const nextDifferenceSelections =
+      index && before && after
+        ? advanceSelectionsToNextDifference(index, before, after)
+        : undefined;
+    if (!nextDifferenceSelections) return;
+    setBefore(nextDifferenceSelections.before);
+    setAfter(nextDifferenceSelections.after);
   };
 
   return (
@@ -236,23 +262,44 @@ function App() {
 
       {index && before && after ? (
         <>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              width: "100%",
+            }}
+          >
+            <button
+              className="app__button"
+              type="button"
+              aria-expanded={!sideSelectorsCollapsed}
+              onClick={() => setSideSelectorsCollapsed((value) => !value)}
+            >
+              {sideSelectorsCollapsed ? "Expand" : "Collapse"}
+            </button>
+          </div>
+
           <section className="selectors" aria-label="Comparison selections">
-            <SideSelector
-              side="before"
-              index={index}
-              selection={before}
-              active={activeSide === "before"}
-              onActivate={() => setActiveSide("before")}
-              onChange={setBefore}
-            />
-            <SideSelector
-              side="after"
-              index={index}
-              selection={after}
-              active={activeSide === "after"}
-              onActivate={() => setActiveSide("after")}
-              onChange={setAfter}
-            />
+            {!sideSelectorsCollapsed && (
+              <>
+                <SideSelector
+                  side="before"
+                  index={index}
+                  selection={before}
+                  active={activeSide === "before"}
+                  onActivate={() => setActiveSide("before")}
+                  onChange={setBefore}
+                />
+                <SideSelector
+                  side="after"
+                  index={index}
+                  selection={after}
+                  active={activeSide === "after"}
+                  onActivate={() => setActiveSide("after")}
+                  onChange={setAfter}
+                />
+              </>
+            )}
           </section>
 
           <section className="timeline" aria-label="Function timeline">
@@ -263,34 +310,77 @@ function App() {
                 </strong>
                 {activeTrace && <span>{traceLabel(activeTrace)}</span>}
               </div>
-              <div className="timeline__navigation">
-                <button onClick={() => stepTimeline(-1)}>
-                  Previous snapshot
-                </button>
-                <button onClick={() => stepTimeline(1)}>Next snapshot</button>
-                {selectionsShareTrace && (
-                  <button disabled={!nextSelections} onClick={advanceBoth}>
-                    Advance both
-                  </button>
+              <div className="timeline__heading-actions">
+                {!timelineCollapsed && (
+                  <div className="timeline__navigation">
+                    <button onClick={() => stepTimeline(-1)}>
+                      Previous snapshot
+                    </button>
+                    <button onClick={() => stepTimeline(1)}>
+                      Next snapshot
+                    </button>
+                    {selectionsShareTrace && (
+                      <>
+                        <button
+                          disabled={!nextSelections}
+                          onClick={advanceBoth}
+                        >
+                          Advance both
+                        </button>
+                        <button
+                          disabled={!nextSelections}
+                          onClick={advanceToNextDifference}
+                        >
+                          Advance to next difference
+                        </button>
+                      </>
+                    )}
+                  </div>
                 )}
+                <button
+                  type="button"
+                  aria-expanded={!timelineCollapsed}
+                  onClick={() => setTimelineCollapsed((value) => !value)}
+                >
+                  {timelineCollapsed ? "Expand" : "Collapse"}
+                </button>
               </div>
             </div>
-            <div className="timeline__track">
-              {timeline.map((entry) => (
-                <button
-                  key={entry.snapshot.id}
-                  className={`timeline__entry timeline__entry--${entry.status}${entry.snapshot.id === activeSelection?.snapshotId
-                      ? " timeline__entry--selected"
-                      : ""
-                    }`}
-                  title={`${snapshotLabel(entry.snapshot)}: ${entry.status}`}
-                  onClick={() => selectTimelineEntry(entry)}
-                >
-                  <span className="timeline__marker" />
-                  <span>{snapshotLabel(entry.snapshot)}</span>
-                </button>
-              ))}
-            </div>
+            {!timelineCollapsed && (
+              <div className="timeline__track">
+                {timeline.map((entry) => {
+                  const isBeforeSelection =
+                    beforeTrace?.id === activeTrace?.id &&
+                    entry.snapshot.id === before?.snapshotId;
+                  const isAfterSelection =
+                    afterTrace?.id === activeTrace?.id &&
+                    entry.snapshot.id === after?.snapshotId;
+                  const isComparisonSelection =
+                    isBeforeSelection || isAfterSelection;
+                  return (
+                    <button
+                      key={entry.snapshot.id}
+                      className={`timeline__entry timeline__entry--${entry.status}${
+                        isComparisonSelection
+                          ? " timeline__entry--comparison-selected"
+                          : ""
+                      }${
+                        entry.snapshot.id === activeSelection?.snapshotId
+                          ? " timeline__entry--selected"
+                          : ""
+                      }`}
+                      title={`${snapshotLabel(entry.snapshot)}: ${entry.status}${
+                        isBeforeSelection ? " · Before" : ""
+                      }${isAfterSelection ? " · After" : ""}`}
+                      onClick={() => selectTimelineEntry(entry)}
+                    >
+                      <span className="timeline__marker" />
+                      <span>{snapshotLabel(entry.snapshot)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </section>
 
           <section className="app__editor" aria-label="IR comparison">
