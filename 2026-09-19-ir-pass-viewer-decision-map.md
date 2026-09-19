@@ -21,8 +21,14 @@ The dump format observed in the current debug compiler has these constraints:
 
 - output is written to stderr;
 - snapshots begin with `*** INITIAL STATE` or `*** AFTER <pass>`;
-- another `INITIAL STATE` starts another pipeline stage;
-- pass names can repeat, so snapshot identity must include stage and ordinal;
+- another `INITIAL STATE` starts another optimization trace segment;
+- some trace segments dump the entire module after each pass, while later
+  segments can run the same pass sequence separately for each function;
+- a pass name is a label, not an identity: a pass such as `DCE` can run more
+  than once in one module-level trace, and a pass such as
+  `RecreateCheapValues` can appear once in each per-function trace;
+- snapshot identity must therefore include the trace-segment ordinal and the
+  pass-invocation ordinal within that segment;
 - functions are delimited by a `function ...` header and `function_end`;
 - functions can disappear, become unreachable, or have duplicate/anonymous
   display names.
@@ -38,16 +44,19 @@ scopes, and the same logical function across all Shermes pipelines, including
 anonymous or duplicate names and removed functions?
 
 **Answer:** Build the parser first and exercise it against several real dumps.
-Use `(stage ordinal, snapshot ordinal)` for snapshots. Initially identify a
-function with a canonicalized header plus its occurrence ordinal within the
-stage, while retaining its raw header, scope, source location if present, and
-body. Record absence explicitly and hash bodies so unchanged snapshots can be
-collapsed. If this heuristic is ambiguous in real programs, investigate adding
-a stable function identifier to Shermes's dump output instead of growing a
-complex fuzzy matcher.
+Use `(trace-segment ordinal, pass-invocation ordinal)` for snapshots, retaining
+the displayed pass name as a label. A trace segment starts at `INITIAL STATE`
+and continues through its following `AFTER` dumps. Initially identify a
+function with a canonicalized header plus its occurrence ordinal, while
+retaining its raw header, scope, source location if present, and body. Record
+absence explicitly and hash bodies so unchanged snapshots can be collapsed.
+If this heuristic is ambiguous in real programs, investigate adding a stable
+function identifier to Shermes's dump output instead of growing a complex
+fuzzy matcher.
 
-Success means fixtures cover repeated pass names, repeated `INITIAL STATE`,
-duplicate names, unreachable functions, and removal.
+Success means fixtures cover a repeated pass within one module-level trace,
+the same pass sequence across separate per-function traces, repeated
+`INITIAL STATE`, duplicate names, unreachable functions, and removal.
 
 ## 2. Establish the core interchange model
 
@@ -153,4 +162,3 @@ becomes a demonstrated problem.
 4. Shermes invocation and diagnostics panel.
 5. Optional IR highlighting and normalized diff experiments.
 6. Neovim or VS Code adapter based on actual usage.
-
