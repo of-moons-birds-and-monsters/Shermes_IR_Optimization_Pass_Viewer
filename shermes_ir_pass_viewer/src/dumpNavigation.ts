@@ -1,0 +1,164 @@
+import type {
+  DumpIndex,
+  FunctionVersion,
+  Snapshot,
+  TraceSegment,
+} from "../../src/dump_parser";
+
+export type ComparisonSide = "before" | "after";
+
+export type Selection = {
+  functionId: string;
+  snapshotId: string;
+};
+
+export type LifecycleStatus =
+  | "present"
+  | "introduced"
+  | "changed"
+  | "unchanged"
+  | "unreachable"
+  | "removed"
+  | "unknown"
+  | "unavailable";
+
+export type TimelineEntry = {
+  snapshot: Snapshot;
+  version?: FunctionVersion;
+  status: LifecycleStatus;
+};
+
+export function snapshotLabel(snapshot: Snapshot): string {
+  if (snapshot.kind === "initial" || !snapshot.pass) {
+    return "Initial state";
+  }
+  const pass = snapshot.pass;
+  const repeated = pass.occurrence > 0
+    ? ` (${pass.occurrence + 1})`
+    : "";
+  return `${pass.name}${repeated}`;
+}
+
+export function traceLabel(trace: TraceSegment): string {
+  if (trace.scope.kind === "module") {
+    return `Trace ${trace.ordinal + 1} · module`;
+  }
+  if (trace.scope.kind === "function") {
+    return `Trace ${trace.ordinal + 1} · function`;
+  }
+  return `Trace ${trace.ordinal + 1}`;
+}
+
+export function timelineFor(
+  index: DumpIndex,
+  trace: TraceSegment,
+  functionId: string,
+): TimelineEntry[] {
+  const versionBySnapshot = new Map(
+    index.functionVersions
+      .filter((version) => version.functionId === functionId)
+      .map((version) => [version.snapshotId, version]),
+  );
+  let previouslyPresent = false;
+
+  return trace.snapshots.map((snapshot, snapshotIndex) => {
+    const version = versionBySnapshot.get(snapshot.id);
+    const previousSnapshot = trace.snapshots[snapshotIndex - 1];
+    const previousVersion = previousSnapshot
+      ? versionBySnapshot.get(previousSnapshot.id)
+      : undefined;
+
+    let status: LifecycleStatus;
+    if (version?.unreachable) {
+      status = "unreachable";
+    } else if (version && previousVersion) {
+      status = version.contentSha256 === previousVersion.contentSha256
+        ? "unchanged"
+        : "changed";
+    } else if (version) {
+      if (trace.scope.kind === "module" && previouslyPresent) {
+        status = "unknown";
+      } else if (trace.scope.kind === "module" && snapshotIndex > 0) {
+        status = "introduced";
+      } else {
+        status = "present";
+      }
+    } else if (trace.scope.kind === "module" && previouslyPresent) {
+      status = "removed";
+    } else {
+      status = "unavailable";
+    }
+
+    if (version) {
+      previouslyPresent = true;
+    }
+    return { snapshot, version, status };
+  });
+}
+
+export function findTraceForSnapshot(
+  index: DumpIndex,
+  snapshotId: string,
+): TraceSegment | undefined {
+  return index.traceSegments.find((trace) =>
+    trace.snapshots.some((snapshot) => snapshot.id === snapshotId),
+  );
+}
+
+export function getTimelineEntry(
+  index: DumpIndex,
+  selection: Selection,
+): TimelineEntry | undefined {
+  const trace = findTraceForSnapshot(index, selection.snapshotId);
+  return trace
+    ? timelineFor(index, trace, selection.functionId).find(
+        (entry) => entry.snapshot.id === selection.snapshotId,
+      )
+    : undefined;
+}
+
+export function functionText(
+  index: DumpIndex,
+  entry: TimelineEntry | undefined,
+): string {
+  if (!entry?.version) {
+    return "";
+  }
+  const { start, end } = entry.version.dumpRange;
+  return index.dump.text.slice(start, end);
+}
+
+export function defaultSelections(
+  index: DumpIndex,
+): { before: Selection; after: Selection } | undefined {
+  const firstFunction = index.functions[0];
+  if (!firstFunction) {
+    return undefined;
+  }
+  const versions = index.functionVersions.filter(
+    (version) => version.functionId === firstFunction.id,
+  );
+  const firstSnapshotId = versions[0]?.snapshotId
+    ?? index.traceSegments[0]?.snapshots[0]?.id;
+  const lastSnapshotId = versions.at(-1)?.snapshotId ?? firstSnapshotId;
+  if (!firstSnapshotId || !lastSnapshotId) {
+    return undefined;
+  }
+  return {
+    before: { functionId: firstFunction.id, snapshotId: firstSnapshotId },
+    after: { functionId: firstFunction.id, snapshotId: lastSnapshotId },
+  };
+}
+
+export function snapshotForFunctionChange(
+  index: DumpIndex,
+  functionId: string,
+  side: ComparisonSide,
+): string | undefined {
+  const versions = index.functionVersions.filter(
+    (version) => version.functionId === functionId,
+  );
+  return side === "before"
+    ? versions[0]?.snapshotId
+    : versions.at(-1)?.snapshotId;
+}

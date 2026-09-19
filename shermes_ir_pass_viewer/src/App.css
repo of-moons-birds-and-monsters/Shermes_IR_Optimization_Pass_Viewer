@@ -1,50 +1,255 @@
+:root {
+  --surface: #171a18;
+  --surface-raised: #202521;
+  --surface-active: #29342d;
+  --border: #3c463f;
+  --text: #f2f3f4;
+  --muted: #aeb8b0;
+  --green: #4f9d69;
+  --gold: #d4af37;
+  --yellow: #fbec5d;
+  --red: #cf6679;
+}
+
 .app {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   min-height: 100%;
-  background: #1e1e1e;
+  background: var(--surface);
+  color: var(--text);
 }
 
 .app__header {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  justify-content: space-between;
   gap: 1rem;
   align-items: center;
   padding: 0.75rem 1rem;
-  color: #d4d4d4;
-  border-bottom: 1px solid #3c3c3c;
+  border-bottom: 1px solid var(--border);
 }
 
 .app__header h1 {
-  grid-column: 1 / -1;
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
 }
 
-.app__header span {
-  font-size: 0.8rem;
-  color: #9d9d9d;
+.app__file-name {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--muted);
+  font-size: 0.75rem;
 }
 
-/*
-* The app color theme is green, gold, yellow, black, and white.
-* I have not decided on shades of those colors just yet.
-*/
-.app__button {
+.app__button,
+.timeline button {
+  border: 1px solid var(--gold);
+  border-radius: 0.35rem;
+  padding: 0.4rem 0.65rem;
   background: #123524;
-  border-radius: 0.5rem;
-  padding: 0.25rem 0.4rem;
-  border-color: #fbec5d;
-  border-width: 3px;
-  color: #f2f3f4;
-  text-shadow: 0 0.2 0.5rem #fbec5d;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.app__button:hover,
+.timeline button:hover {
+  border-color: var(--yellow);
+  background: #194b33;
+}
+
+.app__error,
+.app__empty {
+  margin: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  background: var(--surface-raised);
+}
+
+.app__error {
+  border-color: var(--red);
+}
+
+.selectors {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.side-selector {
+  display: grid;
+  grid-template-columns: minmax(10rem, 1fr) minmax(12rem, 1.6fr);
+  gap: 0.65rem;
+  margin: 0;
+  padding: 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  background: var(--surface-raised);
+}
+
+.side-selector--active {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--gold), transparent 45%);
+}
+
+.side-selector legend {
+  padding: 0 0.35rem;
+  color: var(--yellow);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.side-selector label {
+  display: grid;
+  gap: 0.25rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.side-selector select {
+  width: 100%;
+  min-width: 0;
+  padding: 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.status-banner {
+  grid-column: 1 / -1;
+  padding: 0.35rem 0.5rem;
+  border-left: 3px solid var(--green);
+  background: var(--surface-active);
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.status-banner--removed,
+.status-banner--unknown,
+.status-banner--unavailable {
+  border-left-color: var(--red);
+}
+
+.status-banner--unchanged {
+  border-left-color: var(--muted);
+}
+
+.status-banner--introduced,
+.status-banner--unreachable {
+  border-left-color: var(--gold);
+}
+
+.timeline {
+  padding: 0.65rem 1rem 0.8rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-raised);
+}
+
+.timeline__heading,
+.timeline__heading>div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.timeline__heading span {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.timeline__navigation {
+  flex-shrink: 0;
+}
+
+.timeline__track {
+  display: flex;
+  gap: 0;
+  margin-top: 0.7rem;
+  overflow-x: auto;
+  padding: 0.15rem 0 0.45rem;
+}
+
+.timeline .timeline__entry {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 0.25rem;
+  flex: 0 0 8.5rem;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.timeline .timeline__entry::before {
+  content: "";
+  position: absolute;
+  top: 0.42rem;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--border);
+}
+
+.timeline__marker {
+  z-index: 1;
+  width: 0.85rem;
+  height: 0.85rem;
+  border: 2px solid var(--muted);
+  border-radius: 50%;
+  background: var(--surface-raised);
+}
+
+.timeline__entry--changed .timeline__marker,
+.timeline__entry--present .timeline__marker {
+  border-color: var(--green);
+}
+
+.timeline__entry--introduced .timeline__marker,
+.timeline__entry--unreachable .timeline__marker {
+  border-color: var(--gold);
+}
+
+.timeline__entry--removed .timeline__marker,
+.timeline__entry--unknown .timeline__marker,
+.timeline__entry--unavailable .timeline__marker {
+  border-color: var(--red);
+}
+
+.timeline__entry--selected .timeline__marker {
+  background: var(--yellow);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--yellow), transparent 70%);
+}
+
+.timeline__entry>span:last-child {
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .app__editor {
-  min-height: 800px;
+  flex: 1 1 auto;
+  min-height: 308rem;
 }
 
-.app__options {
-  max-height: 200px;
+@media (max-width: 900px) {
+  .selectors {
+    grid-template-columns: 1fr;
+  }
+
+  .side-selector {
+    grid-template-columns: 1fr;
+  }
+
+  .status-banner {
+    grid-column: 1;
+  }
 }
