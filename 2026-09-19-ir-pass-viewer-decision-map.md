@@ -188,13 +188,62 @@ to locate?
 
 **Answer:** Prototype one screen with:
 
-- a searchable function list with present/removed status;
-- selectors for snapshots A and B, grouped by pipeline stage;
-- a function timeline marking changed, unchanged, unreachable, and absent;
-- previous/next change navigation and an “only changed snapshots” toggle;
+- a searchable function list with lifecycle status;
+- selectors for comparison sides A and B, each containing a function and a
+  snapshot, grouped by trace segment;
+- a function timeline marking introduced, changed, unchanged, unreachable,
+  removed, and unavailable states;
+- separate previous/next snapshot and previous/next change navigation;
+- an “only changed snapshots” toggle;
 - Monaco inline and side-by-side diff modes;
-- an explicit removal banner with an empty comparison model when one side is
-  absent.
+- explicit status banners when a comparison side is unchanged, unavailable,
+  introduced, or removed.
+
+The current Shermes dumper prints the target function after every pass in a
+function pass-manager run and prints the complete current module after every
+pass in a module pass-manager run. It does not omit a surviving function merely
+because that pass made no changes. Therefore:
+
+- **unchanged** means that the function is present and its body hash equals its
+  preceding version in that trace;
+- **removed** means that the function was present and then disappeared within
+  the same module-level trace;
+- **unavailable** means that the function is outside the coverage of a trace,
+  such as another function's per-function pass-manager run;
+- **introduced** means that the internal function name first appears within a
+  module-level trace;
+- **unreachable** remains a present function whose emitted body says it is
+  unreachable.
+
+Do not infer removal by flattening all trace segments into one sequence. A
+function absent from another function's trace is merely unavailable. Under the
+current dumping behavior, a stable function identity should not have a
+present/absent/present gap within one trace. If a fixture violates that
+invariant, preserve the unknown state and report a parser warning rather than
+silently calling the gap unchanged.
+
+Navigation operates on function histories rather than raw global dump order:
+
+- With one function selected, previous/next snapshot moves through every
+  applicable emitted version, while previous/next change skips equal body
+  hashes and stops at lifecycle transitions.
+- With two functions selected, each comparison side owns its function and
+  current version. Unlinked navigation moves only the active side.
+- Linked navigation moves both histories together. When both functions occur
+  in the same module-level trace, they use the same snapshot identity. When
+  they occur in separate per-function traces with the same ordered pass
+  sequence, align them by relative pass-invocation ordinal, retaining the pass
+  name and occurrence as a validation check.
+- If the histories cannot be aligned safely, disable linked navigation and
+  explain why rather than silently comparing unrelated passes.
+
+In linked **snapshot** mode, advance one pass position even if one or both
+function bodies are unchanged; show a `No change in this pass` banner for an
+unchanged side. In linked **change** mode, advance to the next aligned position
+where either selected function changes, and keep the other side at that same
+position with the same banner if it did not change. A removed side uses an
+empty diff model plus a removal banner; an unavailable side uses a distinct
+unavailable banner and must not be described as removed.
 
 Validate the workflow on the typed-class inlining failure before adding visual
 polish.
