@@ -4,6 +4,10 @@ import type {
   Snapshot,
   TraceSegment,
 } from "../../src/dump_parser";
+import type {
+  CompositeIdToFunctionVersionMap,
+  SnapIdToFunctionVersionMap,
+} from "./App";
 
 export type ComparisonSide = "before" | "after";
 
@@ -33,9 +37,7 @@ export function snapshotLabel(snapshot: Snapshot): string {
     return "Initial state";
   }
   const pass = snapshot.pass;
-  const repeated = pass.occurrence > 0
-    ? ` (${pass.occurrence + 1})`
-    : "";
+  const repeated = pass.occurrence > 0 ? ` (${pass.occurrence + 1})` : "";
   return `${pass.name}${repeated}`;
 }
 
@@ -53,7 +55,9 @@ export function timelineFor(
   index: DumpIndex,
   trace: TraceSegment,
   functionId: string,
+  snapshotIdToFunctionVersionMap: React.RefObject<SnapIdToFunctionVersionMap>,
 ): TimelineEntry[] {
+  //const versionBySnapshot = snapshotIdToFunctionVersionMap.current;
   const versionBySnapshot = new Map(
     index.functionVersions
       .filter((version) => version.functionId === functionId)
@@ -74,14 +78,15 @@ export function timelineFor(
     if (version?.unreachable) {
       status = "unreachable";
     } else if (version && previousVersion) {
-      status = version.contentSha256 === previousVersion.contentSha256
-        ? "unchanged"
-        : "changed";
+      status =
+        version.contentSha256 === previousVersion.contentSha256
+          ? "unchanged"
+          : "changed";
     } else if (version) {
       if (
-        trace.scope.kind === "module"
-        && snapshotIndex > 0
-        && (previouslyRemoved || previouslyPresent)
+        trace.scope.kind === "module" &&
+        snapshotIndex > 0 &&
+        (previouslyRemoved || previouslyPresent)
       ) {
         status = "unknown";
       } else if (trace.scope.kind === "module" && snapshotIndex > 0) {
@@ -140,6 +145,9 @@ function moduleStateBeforeTrace(
   return state;
 }
 
+/**
+ * @FIXME: - This is crazy. SHould be using maps here
+ */
 export function findTraceForSnapshot(
   index: DumpIndex,
   snapshotId: string,
@@ -152,12 +160,18 @@ export function findTraceForSnapshot(
 export function getTimelineEntry(
   index: DumpIndex,
   selection: Selection,
+  snapshotIdToTraceMap: React.RefObject<Map<string, TraceSegment>>,
+  snapshotIdToFunctionVersionMap: React.RefObject<SnapIdToFunctionVersionMap>,
 ): TimelineEntry | undefined {
-  const trace = findTraceForSnapshot(index, selection.snapshotId);
+  const trace = snapshotIdToTraceMap.current.get(selection.snapshotId);
+  //const trace = findTraceForSnapshot(index, selection.snapshotId);
   return trace
-    ? timelineFor(index, trace, selection.functionId).find(
-        (entry) => entry.snapshot.id === selection.snapshotId,
-      )
+    ? timelineFor(
+        index,
+        trace,
+        selection.functionId,
+        snapshotIdToFunctionVersionMap,
+      ).find((entry) => entry.snapshot.id === selection.snapshotId)
     : undefined;
 }
 
@@ -182,8 +196,8 @@ export function defaultSelections(
   const versions = index.functionVersions.filter(
     (version) => version.functionId === firstFunction.id,
   );
-  const firstSnapshotId = versions[0]?.snapshotId
-    ?? index.traceSegments[0]?.snapshots[0]?.id;
+  const firstSnapshotId =
+    versions[0]?.snapshotId ?? index.traceSegments[0]?.snapshots[0]?.id;
   const lastSnapshotId = versions.at(-1)?.snapshotId ?? firstSnapshotId;
   if (!firstSnapshotId || !lastSnapshotId) {
     return undefined;
@@ -211,9 +225,12 @@ export function advanceSelectionsTogether(
   index: DumpIndex,
   before: Selection,
   after: Selection,
+  snapshotIdToTraceMap: React.RefObject<Map<string, TraceSegment>>,
 ): { before: Selection; after: Selection } | undefined {
-  const beforeTrace = findTraceForSnapshot(index, before.snapshotId);
-  const afterTrace = findTraceForSnapshot(index, after.snapshotId);
+  const beforeTrace = snapshotIdToTraceMap.current.get(before.snapshotId);
+  const afterTrace = snapshotIdToTraceMap.current.get(after.snapshotId);
+  //const beforeTrace = findTraceForSnapshot(index, before.snapshotId);
+  //const afterTrace = findTraceForSnapshot(index, after.snapshotId);
   if (!beforeTrace || beforeTrace.id !== afterTrace?.id) {
     return undefined;
   }
@@ -238,9 +255,13 @@ export function advanceSelectionsToNextDifference(
   index: DumpIndex,
   before: Selection,
   after: Selection,
+  functionVersionMap: React.RefObject<CompositeIdToFunctionVersionMap>,
+  snapshotIdToTraceMap: React.RefObject<Map<string, TraceSegment>>,
 ): { before: Selection; after: Selection } | undefined {
-  const trace = findTraceForSnapshot(index, before.snapshotId);
-  const afterTrace = findTraceForSnapshot(index, after.snapshotId);
+  const trace = snapshotIdToTraceMap.current.get(before.snapshotId);
+  const afterTrace = snapshotIdToTraceMap.current.get(after.snapshotId);
+  //const trace = findTraceForSnapshot(index, before.snapshotId);
+  //const afterTrace = findTraceForSnapshot(index, after.snapshotId);
   if (!trace || trace.id !== afterTrace?.id) {
     return undefined;
   }
@@ -250,18 +271,18 @@ export function advanceSelectionsToNextDifference(
   const afterPosition = trace.snapshots.findIndex(
     (snapshot) => snapshot.id === after.snapshotId,
   );
-  const versionByFunctionAndSnapshot = new Map(
-    index.functionVersions
-      .filter(
-        (version) =>
-          version.functionId === before.functionId
-          || version.functionId === after.functionId,
-      )
-      .map((version) => [
-        `${version.functionId}\0${version.snapshotId}`,
-        version,
-      ]),
-  );
+  //const versionByFunctionAndSnapshot = new Map(
+  //  index.functionVersions
+  //    .filter(
+  //      (version) =>
+  //        version.functionId === before.functionId ||
+  //        version.functionId === after.functionId,
+  //    )
+  //    .map((version) => [
+  //      `${version.functionId}\0${version.snapshotId}`,
+  //      version,
+  //    ]),
+  //);
 
   for (let offset = 1; ; offset += 1) {
     const nextBefore = trace.snapshots[beforePosition + offset];
@@ -269,15 +290,15 @@ export function advanceSelectionsToNextDifference(
     if (!nextBefore || !nextAfter) {
       return undefined;
     }
-    const beforeVersion = versionByFunctionAndSnapshot.get(
+    const beforeVersion = functionVersionMap.current.get(
       `${before.functionId}\0${nextBefore.id}`,
     );
-    const afterVersion = versionByFunctionAndSnapshot.get(
+    const afterVersion = functionVersionMap.current.get(
       `${after.functionId}\0${nextAfter.id}`,
     );
     if (
-      beforeVersion?.contentSha256 !== afterVersion?.contentSha256
-      || Boolean(beforeVersion) !== Boolean(afterVersion)
+      beforeVersion?.contentSha256 !== afterVersion?.contentSha256 ||
+      Boolean(beforeVersion) !== Boolean(afterVersion)
     ) {
       return {
         before: { ...before, snapshotId: nextBefore.id },
