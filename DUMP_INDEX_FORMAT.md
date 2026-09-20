@@ -28,6 +28,10 @@ files.
 The key words **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**, and **MAY** in
 this document describe normative requirements.
 
+For this specification "observed Shermes dump format" means the `-Xdump-between-passes` output produced by Shermes commit d79485250541b7fb637e061bee9f0de739c8b1fc.
+This observation was recorded on 2026-09-19.
+"observed Shermes dump format" , "shermes dump format", and "dump format" are used interchangeably.
+
 ## 3. Media type and encoding
 
 A dump index is a JSON object encoded as UTF-8.
@@ -303,19 +307,37 @@ Requirements:
 - `scope.kind: "module"` means snapshots in the segment dump the complete
   current module.
 - `scope.kind: "function"` means snapshots dump one function, identified by
-  `functionId`. (This is not currently assignable, "unknown" must be used for 1 function dumps )
+  `functionId`.
 - A parser MUST use `scope.kind: "unknown"` instead of guessing when the dump
   does not provide enough evidence to distinguish module and function scope.
+- If any snapshot in a trace contains more than one function, a parser using
+  the current Shermes dump format MUST classify that trace as
+  `scope.kind: "module"`.
+- When parsing the current Shermes dump format, a parser MUST use
+  `scope.kind: "unknown"` if every snapshot in a trace contains at most one
+  function. The observed shermes dump format does not provide enough information to
+  distinguish a module dump containing one function from an individual
+  function dump.
 
 The fact that a segment contains one function is not, by itself, proof that it
-is a function-scoped trace; a module may contain only one function.
-**This means function scope is not currently assignable**
-All scopes with a single function should be given the kind **"unknown"**
+is a function-scoped trace because a module may contain only one function.
+Consequently, `scope.kind: "function"` cannot
+currently be inferred from the unmodified `-Xdump-between-passes` output alone.
 
-**Why is function scope not assignable?**
-When shermes emits a dump with -Xdump-between-passes it calls a "dump" on either a Module or a Function in PassManager.cpp and the output is not
-labeled to indicate if the dump was created from a Module class or a Function class. Since modules can contain 1 function we cannot
-assume that a 1 function dump is a "function" scope dump and must label it as "unknown" instead
+### Why function scope cannot currently be inferred
+
+In the current shermes dump format, when it emits `-Xdump-between-passes` output, `PassManager.cpp` dumps
+either a `Module` or an individual `Function`. Both paths emit the same
+`*** INITIAL STATE` and `*** AFTER <pass-name>` headings. The output does not
+identify which path produced the trace.
+
+A function-scoped dump contains one function, but a module-scoped dump may
+also contain exactly one function. Therefore, a trace containing one function
+is ambiguous and MUST be assigned `scope.kind: "unknown"`.
+
+A trace containing multiple functions is unambiguous: an individual
+`Function::dump()` cannot produce multiple function definitions, so the trace
+must have been produced by `Module::dump()`.
 
 ## 11. Snapshots
 
