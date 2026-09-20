@@ -155,7 +155,7 @@ digest.
 `FunctionVersion.contentSha256` is calculated from the UTF-8 encoding of:
 
 ```ts
-dump.text.slice(version.dumpRange.start, version.dumpRange.end)
+dump.text.slice(version.dumpRange.start, version.dumpRange.end);
 ```
 
 ## 6. Top-level structure
@@ -303,12 +303,19 @@ Requirements:
 - `scope.kind: "module"` means snapshots in the segment dump the complete
   current module.
 - `scope.kind: "function"` means snapshots dump one function, identified by
-  `functionId`.
+  `functionId`. (This is not currently assignable, "unknown" must be used for 1 function dumps )
 - A parser MUST use `scope.kind: "unknown"` instead of guessing when the dump
   does not provide enough evidence to distinguish module and function scope.
 
 The fact that a segment contains one function is not, by itself, proof that it
 is a function-scoped trace; a module may contain only one function.
+**This means function scope is not currently assignable**
+All scopes with a single function should be given the kind **"unknown"**
+
+**Why is function scope not assignable?**
+When shermes emits a dump with -Xdump-between-passes it calls a "dump" on either a Module or a Function in PassManager.cpp and the output is not
+labeled to indicate if the dump was created from a Module class or a Function class. Since modules can contain 1 function we cannot
+assume that a 1 function dump is a "function" scope dump and must label it as "unknown" instead
 
 ## 11. Snapshots
 
@@ -545,11 +552,7 @@ This example satisfies the range and hash requirements of the format.
     "invocation": {
       "kind": "argv",
       "executable": "./debug_build/bin/shermes",
-      "arguments": [
-        "-typed",
-        "-Xdump-between-passes",
-        "input.ts"
-      ],
+      "arguments": ["-typed", "-Xdump-between-passes", "input.ts"],
       "workingDirectory": "/work/shermes"
     }
   },
