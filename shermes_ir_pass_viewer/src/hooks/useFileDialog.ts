@@ -83,7 +83,8 @@ export interface UseFileDialogOptions {
 }
 const DEFAULT_OPTIONS: UseFileDialogOptions = {
   multiple: true,
-  accept: "*",
+  accept: ".txt,.log,.dump,.ll",
+  //accept: "*",
 };
 
 export const useFileDialog: UseFileDialog = (
@@ -119,6 +120,9 @@ export const useFileDialog: UseFileDialog = (
       ...options,
       ...localOptions,
     };
+    console.log("options: ", options);
+    console.log("localOptions: ", localOptions);
+    console.log("_options: ", _options);
 
     inputRef.current.multiple = _options.multiple!;
     inputRef.current.accept = _options.accept!;
