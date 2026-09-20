@@ -3,6 +3,10 @@
 Status: Draft, schema version 1  
 Project: Shermes IR Pass Viewer
 
+Shermes Version:
+Source Commit: d79485250541b7fb637e061bee9f0de739c8b1fc
+Observed on 2026-09-19
+
 ## 1. Purpose
 
 This document specifies the JSON interchange format used by the Shermes IR
