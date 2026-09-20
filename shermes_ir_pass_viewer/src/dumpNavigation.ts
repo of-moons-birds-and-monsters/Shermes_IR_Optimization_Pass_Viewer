@@ -8,8 +8,14 @@ import type {
 export type ComparisonSide = "before" | "after";
 export type Selection = { functionId: string; snapshotId: string };
 export type LifecycleStatus =
-  | "present" | "introduced" | "changed" | "unchanged"
-  | "unreachable" | "removed" | "unknown" | "unavailable";
+  | "present"
+  | "introduced"
+  | "changed"
+  | "unchanged"
+  | "unreachable"
+  | "removed"
+  | "unknown"
+  | "unavailable";
 export type TimelineEntry = {
   snapshot: Snapshot;
   version?: FunctionVersion;
@@ -29,7 +35,9 @@ function compositeId(functionId: string, snapshotId: string): string {
   return `${functionId}\0${snapshotId}`;
 }
 
-export function createDumpNavigationCache(index: DumpIndex): DumpNavigationCache {
+export function createDumpNavigationCache(
+  index: DumpIndex,
+): DumpNavigationCache {
   const cache: DumpNavigationCache = {
     functionVersionByCompositeId: new Map(),
     functionVersionsBySnapshotId: new Map(),
@@ -44,17 +52,27 @@ export function createDumpNavigationCache(index: DumpIndex): DumpNavigationCache
       compositeId(version.functionId, version.snapshotId),
       version,
     );
-    let versionsInSnapshot = cache.functionVersionsBySnapshotId.get(version.snapshotId);
+    let versionsInSnapshot = cache.functionVersionsBySnapshotId.get(
+      version.snapshotId,
+    );
     if (!versionsInSnapshot) {
       versionsInSnapshot = new Map();
-      cache.functionVersionsBySnapshotId.set(version.snapshotId, versionsInSnapshot);
+      cache.functionVersionsBySnapshotId.set(
+        version.snapshotId,
+        versionsInSnapshot,
+      );
     }
     versionsInSnapshot.set(version.functionId, version);
 
-    let versionsForFunction = cache.functionVersionsByFunctionId.get(version.functionId);
+    let versionsForFunction = cache.functionVersionsByFunctionId.get(
+      version.functionId,
+    );
     if (!versionsForFunction) {
       versionsForFunction = [];
-      cache.functionVersionsByFunctionId.set(version.functionId, versionsForFunction);
+      cache.functionVersionsByFunctionId.set(
+        version.functionId,
+        versionsForFunction,
+      );
     }
     versionsForFunction.push(version);
   }
@@ -76,7 +94,9 @@ function indexPriorModuleRemovals(
   const removedFunctions = new Set<string>();
   for (const trace of index.traceSegments) {
     for (const functionId of removedFunctions) {
-      cache.removedBeforeFunctionAndTrace.add(compositeId(functionId, trace.id));
+      cache.removedBeforeFunctionAndTrace.add(
+        compositeId(functionId, trace.id),
+      );
     }
     if (trace.scope.kind !== "module") continue;
 
@@ -102,15 +122,16 @@ function indexPriorModuleRemovals(
 
 export function snapshotLabel(snapshot: Snapshot): string {
   if (snapshot.kind === "initial" || !snapshot.pass) return "Initial state";
-  const repeated = snapshot.pass.occurrence > 0
-    ? ` (${snapshot.pass.occurrence + 1})`
-    : "";
+  const repeated =
+    snapshot.pass.occurrence > 0 ? ` (${snapshot.pass.occurrence + 1})` : "";
   return `${snapshot.pass.name}${repeated}`;
 }
 
 export function traceLabel(trace: TraceSegment): string {
-  if (trace.scope.kind === "module") return `Trace ${trace.ordinal + 1} · module`;
-  if (trace.scope.kind === "function") return `Trace ${trace.ordinal + 1} · function`;
+  if (trace.scope.kind === "module")
+    return `Trace ${trace.ordinal + 1} · module`;
+  if (trace.scope.kind === "function")
+    return `Trace ${trace.ordinal + 1} · function`;
   return `Trace ${trace.ordinal + 1}`;
 }
 
@@ -139,12 +160,15 @@ export function timelineFor(
     if (version?.unreachable) {
       status = "unreachable";
     } else if (version && previousVersion) {
-      status = version.contentSha256 === previousVersion.contentSha256
-        ? "unchanged" : "changed";
+      status =
+        version.contentSha256 === previousVersion.contentSha256
+          ? "unchanged"
+          : "changed";
     } else if (version) {
       if (
-        trace.scope.kind === "module" && snapshotIndex > 0
-        && (previouslyRemoved || previouslyPresent)
+        trace.scope.kind === "module" &&
+        snapshotIndex > 0 &&
+        (previouslyRemoved || previouslyPresent)
       ) {
         status = "unknown";
       } else if (trace.scope.kind === "module" && snapshotIndex > 0) {
@@ -153,7 +177,8 @@ export function timelineFor(
         status = "present";
       }
     } else if (
-      trace.scope.kind === "module" && (previouslyPresent || previouslyRemoved)
+      trace.scope.kind === "module" &&
+      (previouslyPresent || previouslyRemoved)
     ) {
       status = "removed";
     } else {
@@ -190,9 +215,15 @@ export function getTimelineEntry(
     : undefined;
 }
 
-export function functionText(index: DumpIndex, entry: TimelineEntry | undefined): string {
+export function functionText(
+  index: DumpIndex,
+  entry: TimelineEntry | undefined,
+): string {
   if (!entry?.version) return "";
-  return index.dump.text.slice(entry.version.dumpRange.start, entry.version.dumpRange.end);
+  return index.dump.text.slice(
+    entry.version.dumpRange.start,
+    entry.version.dumpRange.end,
+  );
 }
 
 export function defaultSelections(
@@ -201,9 +232,10 @@ export function defaultSelections(
 ): { before: Selection; after: Selection } | undefined {
   const firstFunction = index.functions[0];
   if (!firstFunction) return undefined;
-  const versions = cache.functionVersionsByFunctionId.get(firstFunction.id) ?? [];
-  const firstSnapshotId = versions[0]?.snapshotId
-    ?? index.traceSegments[0]?.snapshots[0]?.id;
+  const versions =
+    cache.functionVersionsByFunctionId.get(firstFunction.id) ?? [];
+  const firstSnapshotId =
+    versions[0]?.snapshotId ?? index.traceSegments[0]?.snapshots[0]?.id;
   const lastSnapshotId = versions.at(-1)?.snapshotId ?? firstSnapshotId;
   if (!firstSnapshotId || !lastSnapshotId) return undefined;
   return {
@@ -218,7 +250,9 @@ export function snapshotForFunctionChange(
   cache: DumpNavigationCache,
 ): string | undefined {
   const versions = cache.functionVersionsByFunctionId.get(functionId) ?? [];
-  return side === "before" ? versions[0]?.snapshotId : versions.at(-1)?.snapshotId;
+  return side === "before"
+    ? versions[0]?.snapshotId
+    : versions.at(-1)?.snapshotId;
 }
 
 export function advanceSelectionsTogether(
@@ -231,7 +265,8 @@ export function advanceSelectionsTogether(
   if (!beforeTrace || beforeTrace.id !== afterTrace?.id) return undefined;
   const beforePosition = cache.snapshotIdToPosition.get(before.snapshotId);
   const afterPosition = cache.snapshotIdToPosition.get(after.snapshotId);
-  if (beforePosition === undefined || afterPosition === undefined) return undefined;
+  if (beforePosition === undefined || afterPosition === undefined)
+    return undefined;
   const nextBefore = beforeTrace.snapshots[beforePosition + 1];
   const nextAfter = beforeTrace.snapshots[afterPosition + 1];
   if (!nextBefore || !nextAfter) return undefined;
@@ -251,7 +286,8 @@ export function advanceSelectionsToNextDifference(
   if (!trace || trace.id !== afterTrace?.id) return undefined;
   const beforePosition = cache.snapshotIdToPosition.get(before.snapshotId);
   const afterPosition = cache.snapshotIdToPosition.get(after.snapshotId);
-  if (beforePosition === undefined || afterPosition === undefined) return undefined;
+  if (beforePosition === undefined || afterPosition === undefined)
+    return undefined;
 
   for (let offset = 1; ; offset += 1) {
     const nextBefore = trace.snapshots[beforePosition + offset];
@@ -264,8 +300,43 @@ export function advanceSelectionsToNextDifference(
       compositeId(after.functionId, nextAfter.id),
     );
     if (
-      beforeVersion?.contentSha256 !== afterVersion?.contentSha256
-      || Boolean(beforeVersion) !== Boolean(afterVersion)
+      beforeVersion?.contentSha256 !== afterVersion?.contentSha256 ||
+      Boolean(beforeVersion) !== Boolean(afterVersion)
+    ) {
+      return {
+        before: { ...before, snapshotId: nextBefore.id },
+        after: { ...after, snapshotId: nextAfter.id },
+      };
+    }
+  }
+}
+export function moveToPreviousDifference(
+  before: Selection,
+  after: Selection,
+  cache: DumpNavigationCache,
+): { before: Selection; after: Selection } | undefined {
+  const trace = cache.snapshotIdToTrace.get(before.snapshotId);
+  const afterTrace = cache.snapshotIdToTrace.get(after.snapshotId);
+  if (!trace || trace.id !== afterTrace?.id) return undefined;
+  const beforePosition = cache.snapshotIdToPosition.get(before.snapshotId);
+  const afterPosition = cache.snapshotIdToPosition.get(after.snapshotId);
+  if (beforePosition === undefined || afterPosition === undefined)
+    return undefined;
+
+  let len = trace.snapshots.length;
+  for (let offset = len - 1; ; offset -= 1) {
+    const nextBefore = trace.snapshots[beforePosition + offset];
+    const nextAfter = trace.snapshots[afterPosition + offset];
+    if (!nextBefore || !nextAfter) return undefined;
+    const beforeVersion = cache.functionVersionByCompositeId.get(
+      compositeId(before.functionId, nextBefore.id),
+    );
+    const afterVersion = cache.functionVersionByCompositeId.get(
+      compositeId(after.functionId, nextAfter.id),
+    );
+    if (
+      beforeVersion?.contentSha256 !== afterVersion?.contentSha256 ||
+      Boolean(beforeVersion) !== Boolean(afterVersion)
     ) {
       return {
         before: { ...before, snapshotId: nextBefore.id },

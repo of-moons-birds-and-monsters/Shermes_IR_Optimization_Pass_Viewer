@@ -10,7 +10,7 @@ export interface IrDiffEditorProps {
 const handleMount: DiffOnMount = (editor, monaco) => {
   // Both parameters are inferred from DiffOnMount.
   editor.getModifiedEditor().updateOptions({ readOnly: true });
-  monaco.editor.setTheme("vs-dark");
+  monaco.editor.setTheme("vitesse-dark");
 };
 
 export function IrDiffEditor({
@@ -23,7 +23,7 @@ export function IrDiffEditor({
       original={original}
       modified={modified}
       language="llvm"
-      //theme="vs-dark"
+      theme="vitesse-dark"
       onMount={handleMount}
       options={{
         automaticLayout: true,

@@ -13,6 +13,7 @@ import {
   defaultSelections,
   findTraceForSnapshot,
   functionText,
+  moveToPreviousDifference,
   snapshotForFunctionChange,
   snapshotLabel,
   timelineFor,
@@ -293,6 +294,15 @@ function App() {
     setBefore(nextSelections.before);
   };
 
+  const goToPreviousDifference = () => {
+    const nextDifferenceSelections =
+      cache && before && after
+        ? moveToPreviousDifference(before, after, cache)
+        : undefined;
+    if (!nextDifferenceSelections) return;
+    setBefore(nextDifferenceSelections.before);
+    setAfter(nextDifferenceSelections.after);
+  };
   const advanceToNextDifference = () => {
     const nextDifferenceSelections =
       cache && before && after
@@ -302,6 +312,8 @@ function App() {
     setBefore(nextDifferenceSelections.before);
     setAfter(nextDifferenceSelections.after);
   };
+  const sidesOnSameFunction = after?.functionId === before?.functionId;
+
   // NOTE: do not memoize these objects, or else this breaks and risks stale data.
   const matchAfter = () =>
     setBefore({
@@ -402,7 +414,13 @@ function App() {
                           Advance both
                         </button>
                         <button
-                          disabled={!nextSelections}
+                          disabled={!sidesOnSameFunction}
+                          onClick={goToPreviousDifference}
+                        >
+                          Go to previous difference
+                        </button>
+                        <button
+                          disabled={!sidesOnSameFunction}
                           onClick={advanceToNextDifference}
                         >
                           Advance to next difference
