@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "./App.css";
 import { IrDiffEditor } from "./Editor";
 import {
@@ -8,22 +8,20 @@ import {
 import {
   buildDumpIndex,
   type DumpIndex,
-  type FunctionVersion,
-  type Snapshot,
-  type TraceSegment,
 } from "../../src/dump_parser";
 import {
   advanceSelectionsToNextDifference,
   advanceSelectionsTogether,
+  createDumpNavigationCache,
   defaultSelections,
   findTraceForSnapshot,
   functionText,
-  getTimelineEntry,
   snapshotForFunctionChange,
   snapshotLabel,
   timelineFor,
   traceLabel,
   type ComparisonSide,
+  type DumpNavigationCache,
   type Selection,
   type TimelineEntry,
 } from "./dumpNavigation";
@@ -41,8 +39,8 @@ type SideSelectorProps = {
   index: DumpIndex;
   selection: Selection;
   active: boolean;
-  snapshotIdToTraceMap: React.RefObject<Map<string, TraceSegment>>;
-  snapIdToFunctionVersionMap: React.RefObject<SnapIdToFunctionVersionMap>;
+  cache: DumpNavigationCache;
+  timelinesByTraceId: Map<string, TimelineEntry[]>;
   onActivate: () => void;
   onChange: (selection: Selection) => void;
   matchOtherSide: () => void;
@@ -53,21 +51,21 @@ function SideSelector({
   index,
   selection,
   active,
-  snapshotIdToTraceMap,
-  snapIdToFunctionVersionMap,
+  cache,
+  timelinesByTraceId,
   onActivate,
   onChange,
   matchOtherSide,
 }: SideSelectorProps) {
-  const selectedEntry = getTimelineEntry(
-    index,
-    selection,
-    snapshotIdToTraceMap,
-    snapIdToFunctionVersionMap,
-  );
+  const selectedTrace = cache.snapshotIdToTrace.get(selection.snapshotId);
+  const selectedPosition = cache.snapshotIdToPosition.get(selection.snapshotId);
+  const selectedEntry =
+    selectedTrace && selectedPosition !== undefined
+      ? timelinesByTraceId.get(selectedTrace.id)?.[selectedPosition]
+      : undefined;
 
   const changeFunction = (functionId: string) => {
-    const snapshotId = snapshotForFunctionChange(index, functionId, side);
+    const snapshotId = snapshotForFunctionChange(functionId, side, cache);
     if (snapshotId) {
       onChange({ functionId, snapshotId });
     }
@@ -110,12 +108,7 @@ function SideSelector({
           >
             {index.traceSegments.map((trace) => (
               <optgroup key={trace.id} label={traceLabel(trace)}>
-                {timelineFor(
-                  index,
-                  trace,
-                  selection.functionId,
-                  snapIdToFunctionVersionMap,
-                ).map((entry) => (
+                {(timelinesByTraceId.get(trace.id) ?? []).map((entry) => (
                   <option key={entry.snapshot.id} value={entry.snapshot.id}>
                     {entry.snapshot.ordinal + 1}.{" "}
                     {snapshotLabel(entry.snapshot)} · {entry.status}
@@ -134,6 +127,19 @@ function SideSelector({
         )}
       </div>
     </section>
+  );
+}
+
+function createFunctionTimelines(
+  index: DumpIndex,
+  functionId: string,
+  cache: DumpNavigationCache,
+): Map<string, TimelineEntry[]> {
+  return new Map(
+    index.traceSegments.map((trace) => [
+      trace.id,
+      timelineFor(trace, functionId, cache),
+    ]),
   );
 }
 
@@ -157,83 +163,12 @@ function statusMessage(entry: TimelineEntry): string {
       return "Function present";
   }
 }
-export type CompositeIdToFunctionVersionMap = Map<string, FunctionVersion>;
-export type SnapIdToFunctionVersionMap = Map<string, FunctionVersion>;
-/**
- * @description-  initialzies  a  map that contains the functionVersions of the index. The map is keyed by an idividual version with teh functionId and snapShotId formatted like this `${version.functionId}\0${version.snapshotId}` with the value of 'version`
- */
-function initializeFunctionVersionMaps(index: DumpIndex): {
-  snapIdToVersion: SnapIdToFunctionVersionMap;
-  compositiveToVersion: CompositeIdToFunctionVersionMap;
-} {
-  const snapIdToVersion: [string, FunctionVersion][] = [];
-
-  const compositeIdToVersion: [string, FunctionVersion][] = [];
-  let version: FunctionVersion | undefined;
-  for (let i = 0; i < index.functionVersions.length; i++) {
-    version = index.functionVersions[i];
-    snapIdToVersion.push([version.snapshotId, version]);
-    compositeIdToVersion.push([
-      `${version.functionId}\0${version.snapshotId}`,
-      version,
-    ]);
-  }
-
-  const snapIdToVersionMap = new Map(snapIdToVersion);
-  const compositeIdToVersionMap = new Map(compositeIdToVersion);
-
-  //const versionByFunctionAndSnapshot = new Map(
-  //  index.functionVersions.map((version) => [
-  //    `${version.functionId}\0${version.snapshotId}`,
-  //    version,
-  //  ]),
-  //);
-  return {
-    snapIdToVersion: snapIdToVersionMap,
-    compositiveToVersion: compositeIdToVersionMap,
-  };
-}
-function createSnapshotIdToTraceMap(
-  index: DumpIndex,
-): Map<string, TraceSegment> {
-  const map = new Map<string, TraceSegment>();
-  let trace: TraceSegment | undefined;
-  let snapshot: Snapshot | undefined;
-  for (let i = 0; i < index.traceSegments.length; i++) {
-    trace = index.traceSegments[i];
-
-    for (let j = 0; j < trace.snapshots.length; j++) {
-      snapshot = trace.snapshots[j];
-
-      map.set(snapshot.id, trace);
-    }
-  }
-
-  return map;
-}
-
 function App() {
   const [files, open] = useFileDialog(appSettings.useFileDialog);
-  const [index, setIndex] = useState<DumpIndex>();
-  function wrappedSetIndex(index: DumpIndex | undefined) {
-    if (index) {
-      const { snapIdToVersion, compositiveToVersion } =
-        initializeFunctionVersionMaps(index);
-      compositeFunctionVersionMap.current = compositiveToVersion;
-      snapIdToFunctionVersionMap.current = snapIdToVersion;
-
-      snapshotIdToTraceMap.current = createSnapshotIdToTraceMap(index);
-    }
-
-    setIndex(index);
-  }
-  const compositeFunctionVersionMap = useRef<CompositeIdToFunctionVersionMap>(
-    new Map(),
-  );
-  const snapIdToFunctionVersionMap = useRef<SnapIdToFunctionVersionMap>(
-    new Map(),
-  );
-  const snapshotIdToTraceMap = useRef<Map<string, TraceSegment>>(new Map());
+  const [loadedDump, setLoadedDump] = useState<{
+    index: DumpIndex;
+    cache: DumpNavigationCache;
+  }>();
   const [before, setBefore] = useState<Selection>();
   const [after, setAfter] = useState<Selection>();
   const [activeSide, setActiveSide] = useState<ComparisonSide>("after");
@@ -254,9 +189,10 @@ function App() {
       .then(buildDumpIndex)
       .then((nextIndex) => {
         if (cancelled) return;
-        const selections = defaultSelections(nextIndex);
+        const nextCache = createDumpNavigationCache(nextIndex);
+        const selections = defaultSelections(nextIndex, nextCache);
         setError(undefined);
-        wrappedSetIndex(nextIndex);
+        setLoadedDump({ index: nextIndex, cache: nextCache });
         setBefore(selections?.before);
         setAfter(selections?.after);
         setFileName(file.name);
@@ -264,7 +200,7 @@ function App() {
       .catch((reason: unknown) => {
         if (!cancelled) {
           setError(reason instanceof Error ? reason.message : String(reason));
-          wrappedSetIndex(undefined);
+          setLoadedDump(undefined);
           setBefore(undefined);
           setAfter(undefined);
           setFileName(undefined);
@@ -276,50 +212,53 @@ function App() {
     };
   }, [files]);
 
-  const beforeEntry = useMemo(
+  const index = loadedDump?.index;
+  const cache = loadedDump?.cache;
+  const beforeFunctionId = before?.functionId;
+  const afterFunctionId = after?.functionId;
+
+  const beforeTimelines = useMemo(
     () =>
-      index && before
-        ? getTimelineEntry(
-            index,
-            before,
-            snapshotIdToTraceMap,
-            snapIdToFunctionVersionMap,
-          )
-        : undefined,
-    [index, before],
+      index && beforeFunctionId && cache
+        ? createFunctionTimelines(index, beforeFunctionId, cache)
+        : new Map<string, TimelineEntry[]>(),
+    [index, beforeFunctionId, cache],
   );
-  const afterEntry = useMemo(
-    () =>
-      index && after
-        ? getTimelineEntry(
-            index,
-            after,
-            snapshotIdToTraceMap,
-            snapIdToFunctionVersionMap,
-          )
-        : undefined,
-    [index, after],
+  const afterTimelines = useMemo(
+    () => {
+      if (!index || !afterFunctionId || !cache) {
+        return new Map<string, TimelineEntry[]>();
+      }
+      return afterFunctionId === beforeFunctionId
+        ? beforeTimelines
+        : createFunctionTimelines(index, afterFunctionId, cache);
+    }, [index, afterFunctionId, beforeFunctionId, cache, beforeTimelines],
   );
   const beforeTrace =
-    index && before
-      ? findTraceForSnapshot(index, before.snapshotId)
+    cache && before
+      ? findTraceForSnapshot(before.snapshotId, cache)
       : undefined;
   const afterTrace =
-    index && after ? findTraceForSnapshot(index, after.snapshotId) : undefined;
+    cache && after ? findTraceForSnapshot(after.snapshotId, cache) : undefined;
+  const beforePosition =
+    before && cache ? cache.snapshotIdToPosition.get(before.snapshotId) : undefined;
+  const afterPosition =
+    after && cache ? cache.snapshotIdToPosition.get(after.snapshotId) : undefined;
+  const beforeEntry =
+    beforeTrace && beforePosition !== undefined
+      ? beforeTimelines.get(beforeTrace.id)?.[beforePosition]
+      : undefined;
+  const afterEntry =
+    afterTrace && afterPosition !== undefined
+      ? afterTimelines.get(afterTrace.id)?.[afterPosition]
+      : undefined;
   const activeSelection = activeSide === "before" ? before : after;
   const activeTrace =
-    index && activeSelection
-      ? findTraceForSnapshot(index, activeSelection.snapshotId)
+    cache && activeSelection
+      ? findTraceForSnapshot(activeSelection.snapshotId, cache)
       : undefined;
-  const timeline =
-    index && activeSelection && activeTrace
-      ? timelineFor(
-          index,
-          activeTrace,
-          activeSelection.functionId,
-          snapIdToFunctionVersionMap,
-        )
-      : [];
+  const activeTimelines = activeSide === "before" ? beforeTimelines : afterTimelines;
+  const timeline = activeTrace ? (activeTimelines.get(activeTrace.id) ?? []) : [];
 
   const selectTimelineEntry = (entry: TimelineEntry) => {
     if (!activeSelection) return;
@@ -329,10 +268,9 @@ function App() {
   };
 
   const stepTimeline = (offset: -1 | 1) => {
-    if (!activeSelection) return;
-    const current = timeline.findIndex(
-      (entry) => entry.snapshot.id === activeSelection.snapshotId,
-    );
+    if (!activeSelection || !cache) return;
+    const current = cache.snapshotIdToPosition.get(activeSelection.snapshotId);
+    if (current === undefined) return;
     const next = timeline[current + offset];
     if (next) selectTimelineEntry(next);
   };
@@ -341,8 +279,8 @@ function App() {
     beforeTrace && beforeTrace.id === afterTrace?.id,
   );
   const nextSelections =
-    index && before && after
-      ? advanceSelectionsTogether(index, before, after, snapshotIdToTraceMap)
+    cache && before && after
+      ? advanceSelectionsTogether(before, after, cache)
       : undefined;
 
   const advanceBoth = () => {
@@ -354,14 +292,8 @@ function App() {
 
   const advanceToNextDifference = () => {
     const nextDifferenceSelections =
-      index && before && after
-        ? advanceSelectionsToNextDifference(
-            index,
-            before,
-            after,
-            compositeFunctionVersionMap,
-            snapshotIdToTraceMap,
-          )
+      cache && before && after
+        ? advanceSelectionsToNextDifference(before, after, cache)
         : undefined;
     if (!nextDifferenceSelections) return;
     setBefore(nextDifferenceSelections.before);
@@ -393,7 +325,7 @@ function App() {
 
       {error && <div className="app__error">Could not open dump: {error}</div>}
 
-      {index && before && after ? (
+      {index && cache && before && after ? (
         <>
           <div
             style={{
@@ -418,10 +350,10 @@ function App() {
                 <SideSelector
                   side="before"
                   index={index}
+                  cache={cache}
+                  timelinesByTraceId={beforeTimelines}
                   selection={before}
                   active={activeSide === "before"}
-                  snapshotIdToTraceMap={snapshotIdToTraceMap}
-                  snapIdToFunctionVersionMap={snapIdToFunctionVersionMap}
                   onActivate={() => setActiveSide("before")}
                   onChange={setBefore}
                   matchOtherSide={matchAfter}
@@ -429,10 +361,10 @@ function App() {
                 <SideSelector
                   side="after"
                   index={index}
+                  cache={cache}
+                  timelinesByTraceId={afterTimelines}
                   selection={after}
                   active={activeSide === "after"}
-                  snapshotIdToTraceMap={snapshotIdToTraceMap}
-                  snapIdToFunctionVersionMap={snapIdToFunctionVersionMap}
                   onActivate={() => setActiveSide("after")}
                   onChange={setAfter}
                   matchOtherSide={matchBefore}

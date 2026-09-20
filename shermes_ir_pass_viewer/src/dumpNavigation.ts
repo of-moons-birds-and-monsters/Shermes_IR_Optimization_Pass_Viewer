@@ -4,89 +4,147 @@ import type {
   Snapshot,
   TraceSegment,
 } from "../../src/dump_parser";
-import type {
-  CompositeIdToFunctionVersionMap,
-  SnapIdToFunctionVersionMap,
-} from "./App";
 
 export type ComparisonSide = "before" | "after";
-
-export type Selection = {
-  functionId: string;
-  snapshotId: string;
-};
-
+export type Selection = { functionId: string; snapshotId: string };
 export type LifecycleStatus =
-  | "present"
-  | "introduced"
-  | "changed"
-  | "unchanged"
-  | "unreachable"
-  | "removed"
-  | "unknown"
-  | "unavailable";
-
+  | "present" | "introduced" | "changed" | "unchanged"
+  | "unreachable" | "removed" | "unknown" | "unavailable";
 export type TimelineEntry = {
   snapshot: Snapshot;
   version?: FunctionVersion;
   status: LifecycleStatus;
 };
 
-export function snapshotLabel(snapshot: Snapshot): string {
-  if (snapshot.kind === "initial" || !snapshot.pass) {
-    return "Initial state";
+export type DumpNavigationCache = {
+  functionVersionByCompositeId: Map<string, FunctionVersion>;
+  functionVersionsBySnapshotId: Map<string, Map<string, FunctionVersion>>;
+  functionVersionsByFunctionId: Map<string, FunctionVersion[]>;
+  snapshotIdToTrace: Map<string, TraceSegment>;
+  snapshotIdToPosition: Map<string, number>;
+  removedBeforeFunctionAndTrace: Set<string>;
+};
+
+function compositeId(functionId: string, snapshotId: string): string {
+  return `${functionId}\0${snapshotId}`;
+}
+
+export function createDumpNavigationCache(index: DumpIndex): DumpNavigationCache {
+  const cache: DumpNavigationCache = {
+    functionVersionByCompositeId: new Map(),
+    functionVersionsBySnapshotId: new Map(),
+    functionVersionsByFunctionId: new Map(),
+    snapshotIdToTrace: new Map(),
+    snapshotIdToPosition: new Map(),
+    removedBeforeFunctionAndTrace: new Set(),
+  };
+
+  for (const version of index.functionVersions) {
+    cache.functionVersionByCompositeId.set(
+      compositeId(version.functionId, version.snapshotId),
+      version,
+    );
+    let versionsInSnapshot = cache.functionVersionsBySnapshotId.get(version.snapshotId);
+    if (!versionsInSnapshot) {
+      versionsInSnapshot = new Map();
+      cache.functionVersionsBySnapshotId.set(version.snapshotId, versionsInSnapshot);
+    }
+    versionsInSnapshot.set(version.functionId, version);
+
+    let versionsForFunction = cache.functionVersionsByFunctionId.get(version.functionId);
+    if (!versionsForFunction) {
+      versionsForFunction = [];
+      cache.functionVersionsByFunctionId.set(version.functionId, versionsForFunction);
+    }
+    versionsForFunction.push(version);
   }
-  const pass = snapshot.pass;
-  const repeated = pass.occurrence > 0 ? ` (${pass.occurrence + 1})` : "";
-  return `${pass.name}${repeated}`;
+
+  for (const trace of index.traceSegments) {
+    for (const [snapshotPosition, snapshot] of trace.snapshots.entries()) {
+      cache.snapshotIdToTrace.set(snapshot.id, trace);
+      cache.snapshotIdToPosition.set(snapshot.id, snapshotPosition);
+    }
+  }
+  indexPriorModuleRemovals(index, cache);
+  return cache;
+}
+
+function indexPriorModuleRemovals(
+  index: DumpIndex,
+  cache: DumpNavigationCache,
+): void {
+  const removedFunctions = new Set<string>();
+  for (const trace of index.traceSegments) {
+    for (const functionId of removedFunctions) {
+      cache.removedBeforeFunctionAndTrace.add(compositeId(functionId, trace.id));
+    }
+    if (trace.scope.kind !== "module") continue;
+
+    const seenInTrace = new Set<string>();
+    for (const snapshot of trace.snapshots) {
+      const versions = cache.functionVersionsBySnapshotId.get(snapshot.id);
+      if (versions) {
+        for (const functionId of versions.keys()) {
+          seenInTrace.add(functionId);
+        }
+      }
+    }
+    const finalSnapshot = trace.snapshots.at(-1);
+    const presentAtEnd = finalSnapshot
+      ? cache.functionVersionsBySnapshotId.get(finalSnapshot.id)
+      : undefined;
+    for (const functionId of seenInTrace) {
+      if (presentAtEnd?.has(functionId)) removedFunctions.delete(functionId);
+      else removedFunctions.add(functionId);
+    }
+  }
+}
+
+export function snapshotLabel(snapshot: Snapshot): string {
+  if (snapshot.kind === "initial" || !snapshot.pass) return "Initial state";
+  const repeated = snapshot.pass.occurrence > 0
+    ? ` (${snapshot.pass.occurrence + 1})`
+    : "";
+  return `${snapshot.pass.name}${repeated}`;
 }
 
 export function traceLabel(trace: TraceSegment): string {
-  if (trace.scope.kind === "module") {
-    return `Trace ${trace.ordinal + 1} · module`;
-  }
-  if (trace.scope.kind === "function") {
-    return `Trace ${trace.ordinal + 1} · function`;
-  }
+  if (trace.scope.kind === "module") return `Trace ${trace.ordinal + 1} · module`;
+  if (trace.scope.kind === "function") return `Trace ${trace.ordinal + 1} · function`;
   return `Trace ${trace.ordinal + 1}`;
 }
 
 export function timelineFor(
-  index: DumpIndex,
   trace: TraceSegment,
   functionId: string,
-  snapshotIdToFunctionVersionMap: React.RefObject<SnapIdToFunctionVersionMap>,
+  cache: DumpNavigationCache,
 ): TimelineEntry[] {
-  //const versionBySnapshot = snapshotIdToFunctionVersionMap.current;
-  const versionBySnapshot = new Map(
-    index.functionVersions
-      .filter((version) => version.functionId === functionId)
-      .map((version) => [version.snapshotId, version]),
+  const previouslyRemovedBeforeTrace = cache.removedBeforeFunctionAndTrace.has(
+    compositeId(functionId, trace.id),
   );
-  const priorModuleState = moduleStateBeforeTrace(index, trace, functionId);
   let previouslyPresent = false;
-  let previouslyRemoved = priorModuleState === "removed";
-
-  return trace.snapshots.map((snapshot, snapshotIndex) => {
-    const version = versionBySnapshot.get(snapshot.id);
+  let previouslyRemoved = previouslyRemovedBeforeTrace;
+  const timeline = trace.snapshots.map((snapshot, snapshotIndex) => {
+    const version = cache.functionVersionsBySnapshotId
+      .get(snapshot.id)
+      ?.get(functionId);
     const previousSnapshot = trace.snapshots[snapshotIndex - 1];
     const previousVersion = previousSnapshot
-      ? versionBySnapshot.get(previousSnapshot.id)
+      ? cache.functionVersionsBySnapshotId
+          .get(previousSnapshot.id)
+          ?.get(functionId)
       : undefined;
 
     let status: LifecycleStatus;
     if (version?.unreachable) {
       status = "unreachable";
     } else if (version && previousVersion) {
-      status =
-        version.contentSha256 === previousVersion.contentSha256
-          ? "unchanged"
-          : "changed";
+      status = version.contentSha256 === previousVersion.contentSha256
+        ? "unchanged" : "changed";
     } else if (version) {
       if (
-        trace.scope.kind === "module" &&
-        snapshotIndex > 0 &&
-        (previouslyRemoved || previouslyPresent)
+        trace.scope.kind === "module" && snapshotIndex > 0
+        && (previouslyRemoved || previouslyPresent)
       ) {
         status = "unknown";
       } else if (trace.scope.kind === "module" && snapshotIndex > 0) {
@@ -94,9 +152,9 @@ export function timelineFor(
       } else {
         status = "present";
       }
-    } else if (trace.scope.kind === "module" && previouslyPresent) {
-      status = "removed";
-    } else if (trace.scope.kind === "module" && previouslyRemoved) {
+    } else if (
+      trace.scope.kind === "module" && (previouslyPresent || previouslyRemoved)
+    ) {
       status = "removed";
     } else {
       status = "unavailable";
@@ -111,97 +169,43 @@ export function timelineFor(
     }
     return { snapshot, version, status };
   });
+  return timeline;
 }
 
-function moduleStateBeforeTrace(
-  index: DumpIndex,
-  targetTrace: TraceSegment,
-  functionId: string,
-): "removed" | "unknown" {
-  let state: "removed" | "unknown" = "unknown";
-  const snapshotsWithFunction = new Set(
-    index.functionVersions
-      .filter((version) => version.functionId === functionId)
-      .map((version) => version.snapshotId),
-  );
-
-  for (const trace of index.traceSegments) {
-    if (trace.id === targetTrace.id) {
-      break;
-    }
-    if (trace.scope.kind !== "module") {
-      continue;
-    }
-    let presentInThisTrace = false;
-    for (const snapshot of trace.snapshots) {
-      if (snapshotsWithFunction.has(snapshot.id)) {
-        presentInThisTrace = true;
-        state = "unknown";
-      } else if (presentInThisTrace) {
-        state = "removed";
-      }
-    }
-  }
-  return state;
-}
-
-/**
- * @FIXME: - This is crazy. SHould be using maps here
- */
 export function findTraceForSnapshot(
-  index: DumpIndex,
   snapshotId: string,
+  cache: DumpNavigationCache,
 ): TraceSegment | undefined {
-  return index.traceSegments.find((trace) =>
-    trace.snapshots.some((snapshot) => snapshot.id === snapshotId),
-  );
+  return cache.snapshotIdToTrace.get(snapshotId);
 }
 
 export function getTimelineEntry(
-  index: DumpIndex,
   selection: Selection,
-  snapshotIdToTraceMap: React.RefObject<Map<string, TraceSegment>>,
-  snapshotIdToFunctionVersionMap: React.RefObject<SnapIdToFunctionVersionMap>,
+  cache: DumpNavigationCache,
 ): TimelineEntry | undefined {
-  const trace = snapshotIdToTraceMap.current.get(selection.snapshotId);
-  //const trace = findTraceForSnapshot(index, selection.snapshotId);
-  return trace
-    ? timelineFor(
-        index,
-        trace,
-        selection.functionId,
-        snapshotIdToFunctionVersionMap,
-      ).find((entry) => entry.snapshot.id === selection.snapshotId)
+  const trace = cache.snapshotIdToTrace.get(selection.snapshotId);
+  const position = cache.snapshotIdToPosition.get(selection.snapshotId);
+  return trace && position !== undefined
+    ? timelineFor(trace, selection.functionId, cache)[position]
     : undefined;
 }
 
-export function functionText(
-  index: DumpIndex,
-  entry: TimelineEntry | undefined,
-): string {
-  if (!entry?.version) {
-    return "";
-  }
-  const { start, end } = entry.version.dumpRange;
-  return index.dump.text.slice(start, end);
+export function functionText(index: DumpIndex, entry: TimelineEntry | undefined): string {
+  if (!entry?.version) return "";
+  return index.dump.text.slice(entry.version.dumpRange.start, entry.version.dumpRange.end);
 }
 
 export function defaultSelections(
   index: DumpIndex,
+  cache: DumpNavigationCache,
 ): { before: Selection; after: Selection } | undefined {
   const firstFunction = index.functions[0];
-  if (!firstFunction) {
-    return undefined;
-  }
-  const versions = index.functionVersions.filter(
-    (version) => version.functionId === firstFunction.id,
-  );
-  const firstSnapshotId =
-    versions[0]?.snapshotId ?? index.traceSegments[0]?.snapshots[0]?.id;
+  if (!firstFunction) return undefined;
+  const versions = cache.functionVersionsByFunctionId.get(firstFunction.id) ?? [];
+  const firstSnapshotId = versions[0]?.snapshotId
+    ?? index.traceSegments[0]?.snapshots[0]?.id;
   const lastSnapshotId = versions.at(-1)?.snapshotId ?? firstSnapshotId;
-  if (!firstSnapshotId || !lastSnapshotId) {
-    return undefined;
-  }
+  if (!firstSnapshotId || !lastSnapshotId) return undefined;
   return {
     before: { functionId: firstFunction.id, snapshotId: firstSnapshotId },
     after: { functionId: firstFunction.id, snapshotId: lastSnapshotId },
@@ -209,42 +213,28 @@ export function defaultSelections(
 }
 
 export function snapshotForFunctionChange(
-  index: DumpIndex,
   functionId: string,
   side: ComparisonSide,
+  cache: DumpNavigationCache,
 ): string | undefined {
-  const versions = index.functionVersions.filter(
-    (version) => version.functionId === functionId,
-  );
-  return side === "before"
-    ? versions[0]?.snapshotId
-    : versions.at(-1)?.snapshotId;
+  const versions = cache.functionVersionsByFunctionId.get(functionId) ?? [];
+  return side === "before" ? versions[0]?.snapshotId : versions.at(-1)?.snapshotId;
 }
 
 export function advanceSelectionsTogether(
-  index: DumpIndex,
   before: Selection,
   after: Selection,
-  snapshotIdToTraceMap: React.RefObject<Map<string, TraceSegment>>,
+  cache: DumpNavigationCache,
 ): { before: Selection; after: Selection } | undefined {
-  const beforeTrace = snapshotIdToTraceMap.current.get(before.snapshotId);
-  const afterTrace = snapshotIdToTraceMap.current.get(after.snapshotId);
-  //const beforeTrace = findTraceForSnapshot(index, before.snapshotId);
-  //const afterTrace = findTraceForSnapshot(index, after.snapshotId);
-  if (!beforeTrace || beforeTrace.id !== afterTrace?.id) {
-    return undefined;
-  }
-  const beforePosition = beforeTrace.snapshots.findIndex(
-    (snapshot) => snapshot.id === before.snapshotId,
-  );
-  const afterPosition = beforeTrace.snapshots.findIndex(
-    (snapshot) => snapshot.id === after.snapshotId,
-  );
+  const beforeTrace = cache.snapshotIdToTrace.get(before.snapshotId);
+  const afterTrace = cache.snapshotIdToTrace.get(after.snapshotId);
+  if (!beforeTrace || beforeTrace.id !== afterTrace?.id) return undefined;
+  const beforePosition = cache.snapshotIdToPosition.get(before.snapshotId);
+  const afterPosition = cache.snapshotIdToPosition.get(after.snapshotId);
+  if (beforePosition === undefined || afterPosition === undefined) return undefined;
   const nextBefore = beforeTrace.snapshots[beforePosition + 1];
   const nextAfter = beforeTrace.snapshots[afterPosition + 1];
-  if (!nextBefore || !nextAfter) {
-    return undefined;
-  }
+  if (!nextBefore || !nextAfter) return undefined;
   return {
     before: { ...before, snapshotId: nextBefore.id },
     after: { ...after, snapshotId: nextAfter.id },
@@ -252,53 +242,30 @@ export function advanceSelectionsTogether(
 }
 
 export function advanceSelectionsToNextDifference(
-  index: DumpIndex,
   before: Selection,
   after: Selection,
-  functionVersionMap: React.RefObject<CompositeIdToFunctionVersionMap>,
-  snapshotIdToTraceMap: React.RefObject<Map<string, TraceSegment>>,
+  cache: DumpNavigationCache,
 ): { before: Selection; after: Selection } | undefined {
-  const trace = snapshotIdToTraceMap.current.get(before.snapshotId);
-  const afterTrace = snapshotIdToTraceMap.current.get(after.snapshotId);
-  //const trace = findTraceForSnapshot(index, before.snapshotId);
-  //const afterTrace = findTraceForSnapshot(index, after.snapshotId);
-  if (!trace || trace.id !== afterTrace?.id) {
-    return undefined;
-  }
-  const beforePosition = trace.snapshots.findIndex(
-    (snapshot) => snapshot.id === before.snapshotId,
-  );
-  const afterPosition = trace.snapshots.findIndex(
-    (snapshot) => snapshot.id === after.snapshotId,
-  );
-  //const versionByFunctionAndSnapshot = new Map(
-  //  index.functionVersions
-  //    .filter(
-  //      (version) =>
-  //        version.functionId === before.functionId ||
-  //        version.functionId === after.functionId,
-  //    )
-  //    .map((version) => [
-  //      `${version.functionId}\0${version.snapshotId}`,
-  //      version,
-  //    ]),
-  //);
+  const trace = cache.snapshotIdToTrace.get(before.snapshotId);
+  const afterTrace = cache.snapshotIdToTrace.get(after.snapshotId);
+  if (!trace || trace.id !== afterTrace?.id) return undefined;
+  const beforePosition = cache.snapshotIdToPosition.get(before.snapshotId);
+  const afterPosition = cache.snapshotIdToPosition.get(after.snapshotId);
+  if (beforePosition === undefined || afterPosition === undefined) return undefined;
 
   for (let offset = 1; ; offset += 1) {
     const nextBefore = trace.snapshots[beforePosition + offset];
     const nextAfter = trace.snapshots[afterPosition + offset];
-    if (!nextBefore || !nextAfter) {
-      return undefined;
-    }
-    const beforeVersion = functionVersionMap.current.get(
-      `${before.functionId}\0${nextBefore.id}`,
+    if (!nextBefore || !nextAfter) return undefined;
+    const beforeVersion = cache.functionVersionByCompositeId.get(
+      compositeId(before.functionId, nextBefore.id),
     );
-    const afterVersion = functionVersionMap.current.get(
-      `${after.functionId}\0${nextAfter.id}`,
+    const afterVersion = cache.functionVersionByCompositeId.get(
+      compositeId(after.functionId, nextAfter.id),
     );
     if (
-      beforeVersion?.contentSha256 !== afterVersion?.contentSha256 ||
-      Boolean(beforeVersion) !== Boolean(afterVersion)
+      beforeVersion?.contentSha256 !== afterVersion?.contentSha256
+      || Boolean(beforeVersion) !== Boolean(afterVersion)
     ) {
       return {
         before: { ...before, snapshotId: nextBefore.id },

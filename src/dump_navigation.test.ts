@@ -4,6 +4,7 @@ import { buildDumpIndex } from "./dump_parser.ts";
 import {
   advanceSelectionsToNextDifference,
   advanceSelectionsTogether,
+  createDumpNavigationCache,
   timelineFor,
   type Selection,
 } from "../shermes_ir_pass_viewer/src/dumpNavigation.ts";
@@ -19,6 +20,44 @@ function fn(name: string, value = "undefined"): string {
   ].join("\n");
 }
 
+test("indexes every function version in a shared module snapshot", async () => {
+  const dump = [
+    "*** INITIAL STATE", "", fn("first"), "", fn("second"), "",
+  ].join("\n");
+  const index = await buildDumpIndex(encoder.encode(dump));
+  const cache = createDumpNavigationCache(index);
+  const snapshotId = index.traceSegments[0].snapshots[0].id;
+  const versions = cache.functionVersionsBySnapshotId.get(snapshotId);
+
+  assert.equal(versions?.size, 2);
+  assert.equal(versions?.get(index.functions[0].id)?.functionId, index.functions[0].id);
+  assert.equal(versions?.get(index.functions[1].id)?.functionId, index.functions[1].id);
+});
+
+test("indexes trace, ordinal, and chronological function history", async () => {
+  const dump = [
+    "*** INITIAL STATE", "", fn("target", "0"), "", fn("helper"), "",
+    "*** AFTER Change", "", fn("target", "1"), "", fn("helper"), "",
+    "*** INITIAL STATE", "", fn("target", "2"), "", fn("helper"), "",
+  ].join("\n");
+  const index = await buildDumpIndex(encoder.encode(dump));
+  const cache = createDumpNavigationCache(index);
+  const target = index.functions.find((identity) => identity.internalName === "target");
+  assert.ok(target);
+  const snapshots = index.traceSegments.flatMap((trace) => trace.snapshots);
+
+  assert.equal(cache.snapshotIdToTrace.get(snapshots[0].id)?.id, index.traceSegments[0].id);
+  assert.equal(cache.snapshotIdToTrace.get(snapshots[2].id)?.id, index.traceSegments[1].id);
+  assert.equal(cache.snapshotIdToPosition.get(snapshots[0].id), 0);
+  assert.equal(cache.snapshotIdToPosition.get(snapshots[1].id), 1);
+  assert.deepEqual(
+    cache.functionVersionsByFunctionId
+      .get(target.id)
+      ?.map((version) => version.snapshotId),
+    snapshots.map((snapshot) => snapshot.id),
+  );
+});
+
 test("carries only an established removal into later module traces", async () => {
   const dump = [
     "*** INITIAL STATE", "", fn("target"), "", fn("helper"), "",
@@ -28,12 +67,13 @@ test("carries only an established removal into later module traces", async () =>
     "*** INITIAL STATE", "", fn("target"), "", fn("helper"), "",
   ].join("\n");
   const index = await buildDumpIndex(encoder.encode(dump));
+  const cache = createDumpNavigationCache(index);
   const target = index.functions.find((identity) => identity.internalName === "target");
   assert.ok(target);
 
-  assert.equal(timelineFor(index, index.traceSegments[1], target.id)[0].status, "removed");
-  assert.equal(timelineFor(index, index.traceSegments[2], target.id)[0].status, "unavailable");
-  assert.equal(timelineFor(index, index.traceSegments[3], target.id)[0].status, "present");
+  assert.equal(timelineFor(index.traceSegments[1], target.id, cache)[0].status, "removed");
+  assert.equal(timelineFor(index.traceSegments[2], target.id, cache)[0].status, "unavailable");
+  assert.equal(timelineFor(index.traceSegments[3], target.id, cache)[0].status, "present");
 });
 
 test("does not infer a new removal only from a later module trace absence", async () => {
@@ -42,10 +82,11 @@ test("does not infer a new removal only from a later module trace absence", asyn
     "*** INITIAL STATE", "", fn("helper"), "", fn("other"), "",
   ].join("\n");
   const index = await buildDumpIndex(encoder.encode(dump));
+  const cache = createDumpNavigationCache(index);
   const target = index.functions.find((identity) => identity.internalName === "target");
   assert.ok(target);
 
-  assert.equal(timelineFor(index, index.traceSegments[1], target.id)[0].status, "unavailable");
+  assert.equal(timelineFor(index.traceSegments[1], target.id, cache)[0].status, "unavailable");
 });
 
 test("advances both selections by one ordinal while preserving their gap", async () => {
@@ -56,19 +97,20 @@ test("advances both selections by one ordinal while preserving their gap", async
     "*** AFTER C", "", fn("target", "3"), "",
   ].join("\n");
   const index = await buildDumpIndex(encoder.encode(dump));
+  const cache = createDumpNavigationCache(index);
   const target = index.functions[0];
   const snapshots = index.traceSegments[0].snapshots;
   const before: Selection = { functionId: target.id, snapshotId: snapshots[0].id };
   const after: Selection = { functionId: target.id, snapshotId: snapshots[1].id };
 
-  const advanced = advanceSelectionsTogether(index, before, after);
+  const advanced = advanceSelectionsTogether(before, after, cache);
   assert.equal(advanced?.before.snapshotId, snapshots[1].id);
   assert.equal(advanced?.after.snapshotId, snapshots[2].id);
 
-  const atEnd = advanceSelectionsTogether(index, advanced!.before, {
+  const atEnd = advanceSelectionsTogether(advanced!.before, {
     ...advanced!.after,
     snapshotId: snapshots[3].id,
-  });
+  }, cache);
   assert.equal(atEnd, undefined);
 });
 
@@ -81,17 +123,18 @@ test("advances both selections to the next pair with different contents", async 
     "*** AFTER D", "", fn("target", "1"), "",
   ].join("\n");
   const index = await buildDumpIndex(encoder.encode(dump));
+  const cache = createDumpNavigationCache(index);
   const target = index.functions[0];
   const snapshots = index.traceSegments[0].snapshots;
   const before: Selection = { functionId: target.id, snapshotId: snapshots[0].id };
   const after: Selection = { functionId: target.id, snapshotId: snapshots[1].id };
 
-  const advanced = advanceSelectionsToNextDifference(index, before, after);
+  const advanced = advanceSelectionsToNextDifference(before, after, cache);
   assert.equal(advanced?.before.snapshotId, snapshots[2].id);
   assert.equal(advanced?.after.snapshotId, snapshots[3].id);
 
   assert.equal(
-    advanceSelectionsToNextDifference(index, advanced!.before, advanced!.after),
+    advanceSelectionsToNextDifference(advanced!.before, advanced!.after, cache),
     undefined,
   );
 });
