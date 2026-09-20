@@ -310,7 +310,7 @@ export function advanceSelectionsToNextDifference(
     }
   }
 }
-export function moveToPreviousDifference(
+export function moveSelectionsToPreviousDifference(
   before: Selection,
   after: Selection,
   cache: DumpNavigationCache,
@@ -323,24 +323,23 @@ export function moveToPreviousDifference(
   if (beforePosition === undefined || afterPosition === undefined)
     return undefined;
 
-  let len = trace.snapshots.length;
-  for (let offset = len - 1; ; offset -= 1) {
-    const nextBefore = trace.snapshots[beforePosition + offset];
-    const nextAfter = trace.snapshots[afterPosition + offset];
-    if (!nextBefore || !nextAfter) return undefined;
+  for (let offset = -1; ; offset -= 1) {
+    const previousBefore = trace.snapshots[beforePosition + offset];
+    const previousAfter = trace.snapshots[afterPosition + offset];
+    if (!previousBefore || !previousAfter) return undefined;
     const beforeVersion = cache.functionVersionByCompositeId.get(
-      compositeId(before.functionId, nextBefore.id),
+      compositeId(before.functionId, previousBefore.id),
     );
     const afterVersion = cache.functionVersionByCompositeId.get(
-      compositeId(after.functionId, nextAfter.id),
+      compositeId(after.functionId, previousAfter.id),
     );
     if (
       beforeVersion?.contentSha256 !== afterVersion?.contentSha256 ||
       Boolean(beforeVersion) !== Boolean(afterVersion)
     ) {
       return {
-        before: { ...before, snapshotId: nextBefore.id },
-        after: { ...after, snapshotId: nextAfter.id },
+        before: { ...before, snapshotId: previousBefore.id },
+        after: { ...after, snapshotId: previousAfter.id },
       };
     }
   }

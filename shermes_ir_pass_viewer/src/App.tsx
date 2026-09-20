@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import { IrDiffEditor } from "./Editor";
 import {
@@ -13,7 +13,7 @@ import {
   defaultSelections,
   findTraceForSnapshot,
   functionText,
-  moveToPreviousDifference,
+  moveSelectionsToPreviousDifference,
   snapshotForFunctionChange,
   snapshotLabel,
   timelineFor,
@@ -175,6 +175,7 @@ function App() {
   const [error, setError] = useState<string>();
   const [timelineCollapsed, setTimelineCollapsed] = useState(false);
   const [sideSelectorsCollapsed, setSideSelectorsCollapsed] = useState(false);
+  const timelineTrackRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const file = files?.[0];
@@ -264,6 +265,66 @@ function App() {
     ? (activeTimelines.get(activeTrace.id) ?? [])
     : [];
 
+  useLayoutEffect(() => {
+    const track = timelineTrackRef.current;
+    if (!track || timelineCollapsed || !activeTrace || track.clientWidth === 0)
+      return;
+
+    const selectedPositions: number[] = [];
+    if (beforeTrace?.id === activeTrace.id && beforePosition !== undefined) {
+      selectedPositions.push(beforePosition);
+    }
+    if (
+      afterTrace?.id === activeTrace.id &&
+      afterPosition !== undefined &&
+      afterPosition !== beforePosition
+    ) {
+      selectedPositions.push(afterPosition);
+    }
+    if (selectedPositions.length === 0) return;
+
+    const selectedEntries = selectedPositions
+      .map((position) => track.children.item(position) as HTMLElement | null)
+      .filter((entry): entry is HTMLElement => entry !== null);
+    if (selectedEntries.length !== selectedPositions.length) return;
+
+    const trackBounds = track.getBoundingClientRect();
+    const entryBounds = selectedEntries.map((entry) =>
+      entry.getBoundingClientRect(),
+    );
+    const selectionLeft =
+      Math.min(...entryBounds.map((bounds) => bounds.left)) -
+      trackBounds.left +
+      track.scrollLeft;
+    const selectionRight =
+      Math.max(...entryBounds.map((bounds) => bounds.right)) -
+      trackBounds.left +
+      track.scrollLeft;
+
+    // Do not choose one selection over the other when they cannot both fit.
+    if (selectionRight - selectionLeft > track.clientWidth) return;
+
+    const visibleLeft = track.scrollLeft;
+    const visibleRight = visibleLeft + track.clientWidth;
+    let nextScrollLeft = visibleLeft;
+    if (selectionLeft < visibleLeft) {
+      nextScrollLeft = selectionLeft;
+    } else if (selectionRight > visibleRight) {
+      nextScrollLeft = selectionRight - track.clientWidth;
+    }
+
+    if (nextScrollLeft !== visibleLeft) {
+      track.scrollTo({ left: nextScrollLeft, behavior: "smooth" });
+    }
+  }, [
+    activeTrace,
+    afterPosition,
+    afterTrace,
+    beforePosition,
+    beforeTrace,
+    timelineCollapsed,
+  ]);
+
   const selectTimelineEntry = (entry: TimelineEntry) => {
     if (!activeSelection) return;
     const selection = { ...activeSelection, snapshotId: entry.snapshot.id };
@@ -286,6 +347,14 @@ function App() {
     cache && before && after
       ? advanceSelectionsTogether(before, after, cache)
       : undefined;
+  const previousDifferenceSelections =
+    cache && before && after && after.functionId === before.functionId
+      ? moveSelectionsToPreviousDifference(before, after, cache)
+      : undefined;
+  const nextDifferenceSelections =
+    cache && before && after && after.functionId === before.functionId
+      ? advanceSelectionsToNextDifference(before, after, cache)
+      : undefined;
 
   const advanceBoth = () => {
     if (!nextSelections) return;
@@ -295,25 +364,15 @@ function App() {
   };
 
   const goToPreviousDifference = () => {
-    const nextDifferenceSelections =
-      cache && before && after
-        ? moveToPreviousDifference(before, after, cache)
-        : undefined;
-    if (!nextDifferenceSelections) return;
-    setBefore(nextDifferenceSelections.before);
-    setAfter(nextDifferenceSelections.after);
+    if (!previousDifferenceSelections) return;
+    setBefore(previousDifferenceSelections.before);
+    setAfter(previousDifferenceSelections.after);
   };
   const advanceToNextDifference = () => {
-    const nextDifferenceSelections =
-      cache && before && after
-        ? advanceSelectionsToNextDifference(before, after, cache)
-        : undefined;
     if (!nextDifferenceSelections) return;
     setBefore(nextDifferenceSelections.before);
     setAfter(nextDifferenceSelections.after);
   };
-  const sidesOnSameFunction = after?.functionId === before?.functionId;
-
   // NOTE: do not memoize these objects, or else this breaks and risks stale data.
   const matchAfter = () =>
     setBefore({
@@ -414,13 +473,13 @@ function App() {
                           Advance both
                         </button>
                         <button
-                          disabled={!sidesOnSameFunction}
+                          disabled={!previousDifferenceSelections}
                           onClick={goToPreviousDifference}
                         >
                           Go to previous difference
                         </button>
                         <button
-                          disabled={!sidesOnSameFunction}
+                          disabled={!nextDifferenceSelections}
                           onClick={advanceToNextDifference}
                         >
                           Advance to next difference
@@ -439,7 +498,7 @@ function App() {
               </div>
             </div>
             {!timelineCollapsed && (
-              <div className="timeline__track">
+              <div className="timeline__track" ref={timelineTrackRef}>
                 {timeline.map((entry) => {
                   const isBeforeSelection =
                     beforeTrace?.id === activeTrace?.id &&
