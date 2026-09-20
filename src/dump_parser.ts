@@ -4,12 +4,14 @@ export type TextRange = {
 };
 export type DumpIndex = {
   format: "shermes-ir-pass-viewer-dump-index";
-  schemaVersion: 1;
+  schemaVersion: 2;
   producer: Producer;
   dump: EmbeddedDump;
   traceSegments: TraceSegment[];
   functions: FunctionIdentity[];
   functionVersions: FunctionVersion[];
+  basicBlockVersions: BasicBlockVersion[];
+  instructionVersions: InstructionVersion[];
   diagnostics: Diagnostic[];
   warnings?: ParseWarning[];
 };
@@ -98,6 +100,27 @@ export type FunctionVersion = {
   contentSha256: string;
   unreachable?: boolean;
 };
+export type BasicBlockVersion = {
+  id: string;
+  functionVersionId: string;
+  functionId: string;
+  snapshotId: string;
+  number: number;
+  ordinal: number;
+  dumpRange: TextRange;
+  contentSha256: string;
+};
+export type InstructionVersion = {
+  id: string;
+  functionVersionId: string;
+  functionId: string;
+  snapshotId: string;
+  number: number;
+  basicBlockNumber: number;
+  ordinalInBlock: number;
+  dumpRange: TextRange;
+  contentSha256: string;
+};
 export type Diagnostic = {
   id: string;
   dumpRange: TextRange;
@@ -122,11 +145,16 @@ type DumpLine = {
 };
 
 type OpenFunction = {
+  versionId: string;
   functionId: string;
   snapshotId: string;
   start: number;
   headerRange: TextRange;
   unreachable: boolean;
+  blocks: BasicBlockVersion[];
+  instructions: InstructionVersion[];
+  currentBlock?: BasicBlockVersion;
+  instructionOrdinal: number;
 };
 
 const FUNCTION_HEADER_KINDS = [
@@ -141,7 +169,7 @@ const FUNCTION_HEADER_KINDS = [
 const DEFAULT_PRODUCER: Producer = {
   parser: {
     name: "ir-pass-viewer",
-    version: "0.1.0",
+    version: "0.2.0",
   },
 };
 
@@ -153,6 +181,9 @@ export async function buildDumpIndex(
   const traceSegments: TraceSegment[] = [];
   const functions: FunctionIdentity[] = [];
   const functionVersions: FunctionVersion[] = [];
+  const basicBlockVersions: BasicBlockVersion[] = [];
+  const instructionVersions: InstructionVersion[] = [];
+  const blockInstructionLines = new Map<string, string[]>();
   const diagnostics: Diagnostic[] = [];
   const warnings: ParseWarning[] = [];
   const functionByInternalName = new Map<string, FunctionIdentity>();
@@ -302,12 +333,39 @@ export async function buildDumpIndex(
       snapshotFunctions.add(identity.id);
 
       openFunction = {
+        versionId: `function-version:${functionVersions.length}`,
         functionId: identity.id,
         snapshotId: currentSnapshot.id,
         start: line.start,
         headerRange: { start: line.start, end: line.contentEnd },
         unreachable: hasUnreachableAttribute(line.text),
+        blocks: [],
+        instructions: [],
+        instructionOrdinal: 0,
       };
+      continue;
+    }
+
+    const blockMatch = /^%BB(\d+):$/.exec(line.text);
+    if (blockMatch && openFunction) {
+      const blockNumber = parseIrNumber(blockMatch[1], "basic block", line);
+      if (openFunction.currentBlock) {
+        openFunction.currentBlock.dumpRange.end = line.start;
+      }
+      const block: BasicBlockVersion = {
+        id: `basic-block-version:${basicBlockVersions.length + openFunction.blocks.length}`,
+        functionVersionId: openFunction.versionId,
+        functionId: openFunction.functionId,
+        snapshotId: openFunction.snapshotId,
+        number: blockNumber,
+        ordinal: openFunction.blocks.length,
+        dumpRange: { start: line.start, end: line.end },
+        contentSha256: "",
+      };
+      openFunction.blocks.push(block);
+      openFunction.currentBlock = block;
+      openFunction.instructionOrdinal = 0;
+      blockInstructionLines.set(block.id, []);
       continue;
     }
 
@@ -321,8 +379,12 @@ export async function buildDumpIndex(
         continue;
       }
 
+      if (openFunction.currentBlock) {
+        openFunction.currentBlock.dumpRange.end = line.start;
+      }
+
       functionVersions.push({
-        id: `function-version:${functionVersions.length}`,
+        id: openFunction.versionId,
         functionId: openFunction.functionId,
         snapshotId: openFunction.snapshotId,
         dumpRange: { start: openFunction.start, end: line.contentEnd },
@@ -330,7 +392,38 @@ export async function buildDumpIndex(
         contentSha256: "",
         ...(openFunction.unreachable ? { unreachable: true } : {}),
       });
+      basicBlockVersions.push(...openFunction.blocks);
+      instructionVersions.push(...openFunction.instructions);
       openFunction = undefined;
+      continue;
+    }
+
+    if (
+      openFunction?.currentBlock &&
+      line.text.length > 0 &&
+      !/^\s*;/.test(line.text)
+    ) {
+      blockInstructionLines.get(openFunction.currentBlock.id)?.push(line.text);
+      const instructionMatch = /^\s*%(\d+)\s*=/.exec(line.text);
+      if (instructionMatch) {
+        const instructionNumber = parseIrNumber(
+          instructionMatch[1],
+          "instruction",
+          line,
+        );
+        openFunction.instructions.push({
+          id: `instruction-version:${instructionVersions.length + openFunction.instructions.length}`,
+          functionVersionId: openFunction.versionId,
+          functionId: openFunction.functionId,
+          snapshotId: openFunction.snapshotId,
+          number: instructionNumber,
+          basicBlockNumber: openFunction.currentBlock.number,
+          ordinalInBlock: openFunction.instructionOrdinal,
+          dumpRange: { start: line.start, end: line.contentEnd },
+          contentSha256: "",
+        });
+      }
+      openFunction.instructionOrdinal += 1;
     }
   }
 
@@ -366,10 +459,12 @@ export async function buildDumpIndex(
 
   const textSha256 = await sha256Hex(text);
   await hashFunctionVersions(text, functionVersions);
+  await hashInstructionVersions(text, instructionVersions);
+  await hashBasicBlockVersions(basicBlockVersions, blockInstructionLines);
 
   return {
     format: "shermes-ir-pass-viewer-dump-index",
-    schemaVersion: 1,
+    schemaVersion: 2,
     producer: options?.producer ?? DEFAULT_PRODUCER,
     dump: {
       text,
@@ -380,6 +475,8 @@ export async function buildDumpIndex(
     traceSegments,
     functions,
     functionVersions,
+    basicBlockVersions,
+    instructionVersions,
     diagnostics,
     warnings,
   };
@@ -412,6 +509,16 @@ function* linesOf(text: string): Generator<DumpLine> {
     };
     start = end;
   }
+}
+
+function parseIrNumber(text: string, kind: string, line: DumpLine): number {
+  const number = Number.parseInt(text, 10);
+  if (!Number.isSafeInteger(number)) {
+    throw new RangeError(
+      `The ${kind} number at UTF-16 offset ${line.start} exceeds the safe integer range.`,
+    );
+  }
+  return number;
 }
 
 function parseFunctionHeader(
@@ -555,9 +662,58 @@ async function hashFunctionVersions(
   }
 }
 
+async function hashInstructionVersions(
+  text: string,
+  versions: InstructionVersion[],
+): Promise<void> {
+  await hashInBatches(versions, async (version) => {
+    version.contentSha256 = await sha256Hex(
+      text.slice(version.dumpRange.start, version.dumpRange.end),
+    );
+  });
+}
+
+async function hashBasicBlockVersions(
+  versions: BasicBlockVersion[],
+  instructionLines: Map<string, string[]>,
+): Promise<void> {
+  const encoder = new TextEncoder();
+  await hashInBatches(versions, async (version) => {
+    const encodedLines = (instructionLines.get(version.id) ?? []).map((line) =>
+      encoder.encode(line),
+    );
+    const size = encodedLines.reduce((total, line) => total + 8 + line.length, 0);
+    const data = new Uint8Array(size);
+    const view = new DataView(data.buffer);
+    let offset = 0;
+    for (const line of encodedLines) {
+      view.setBigUint64(offset, BigInt(line.length), false);
+      offset += 8;
+      data.set(line, offset);
+      offset += line.length;
+    }
+    version.contentSha256 = await sha256Bytes(data);
+  });
+}
+
+async function hashInBatches<T>(
+  values: T[],
+  hash: (value: T) => Promise<void>,
+): Promise<void> {
+  const batchSize = 64;
+  for (let start = 0; start < values.length; start += batchSize) {
+    await Promise.all(values.slice(start, start + batchSize).map(hash));
+  }
+}
+
 async function sha256Hex(text: string): Promise<string> {
-  const data = new TextEncoder().encode(text);
-  const digest = await globalThis.crypto.subtle.digest("SHA-256", data);
+  return sha256Bytes(new TextEncoder().encode(text));
+}
+
+async function sha256Bytes(data: Uint8Array): Promise<string> {
+  const buffer = new ArrayBuffer(data.byteLength);
+  new Uint8Array(buffer).set(data);
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", buffer);
   return [...new Uint8Array(digest)]
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");

@@ -16,6 +16,8 @@ type FileResult = {
   snapshots: number;
   functions: number;
   functionVersions: number;
+  basicBlockVersions: number;
+  instructionVersions: number;
   diagnostics: number;
   warnings: number;
   milliseconds: number;
@@ -50,6 +52,8 @@ for (const path of paths) {
     ),
     functions: index.functions.length,
     functionVersions: index.functionVersions.length,
+    basicBlockVersions: index.basicBlockVersions.length,
+    instructionVersions: index.instructionVersions.length,
     diagnostics: index.diagnostics.length,
     warnings: index.warnings?.length ?? 0,
     milliseconds: Math.round((performance.now() - start) * 10) / 10,
@@ -67,6 +71,8 @@ process.stdout.write(
         snapshots: sum(results, "snapshots"),
         functions: sum(results, "functions"),
         functionVersions: sum(results, "functionVersions"),
+        basicBlockVersions: sum(results, "basicBlockVersions"),
+        instructionVersions: sum(results, "instructionVersions"),
         diagnostics: sum(results, "diagnostics"),
         warnings: sum(results, "warnings"),
         milliseconds: Math.round(sum(results, "milliseconds") * 10) / 10,
@@ -91,6 +97,9 @@ function validateIndex(index: DumpIndex): void {
     ),
   );
   const functionIds = new Set(index.functions.map((identity) => identity.id));
+  const functionVersions = new Map(
+    index.functionVersions.map((version) => [version.id, version]),
+  );
 
   for (const trace of index.traceSegments) {
     assertRange(index.dump.text, trace.dumpRange, `trace ${trace.id}`);
@@ -141,6 +150,60 @@ function validateIndex(index: DumpIndex): void {
     ) {
       throw new Error(`${version.id} does not end at function_end`);
     }
+  }
+
+  const blockKeys = new Set<string>();
+  for (const block of index.basicBlockVersions) {
+    const parent = functionVersions.get(block.functionVersionId);
+    if (!parent) throw new Error(`Unknown function version for ${block.id}`);
+    if (
+      parent.functionId !== block.functionId ||
+      parent.snapshotId !== block.snapshotId
+    ) {
+      throw new Error(`Inconsistent parent references for ${block.id}`);
+    }
+    assertContainedRange(index.dump.text, block.dumpRange, parent.dumpRange, block.id);
+    const key = `${block.functionVersionId}\0${block.number}`;
+    if (blockKeys.has(key)) throw new Error(`Duplicate block number for ${block.id}`);
+    blockKeys.add(key);
+  }
+
+  const instructionKeys = new Set<string>();
+  for (const instruction of index.instructionVersions) {
+    const parent = functionVersions.get(instruction.functionVersionId);
+    if (!parent) throw new Error(`Unknown function version for ${instruction.id}`);
+    if (
+      parent.functionId !== instruction.functionId ||
+      parent.snapshotId !== instruction.snapshotId
+    ) {
+      throw new Error(`Inconsistent parent references for ${instruction.id}`);
+    }
+    assertContainedRange(
+      index.dump.text,
+      instruction.dumpRange,
+      parent.dumpRange,
+      instruction.id,
+    );
+    if (!blockKeys.has(`${instruction.functionVersionId}\0${instruction.basicBlockNumber}`)) {
+      throw new Error(`Unknown basic block for ${instruction.id}`);
+    }
+    const key = `${instruction.functionVersionId}\0${instruction.number}`;
+    if (instructionKeys.has(key)) {
+      throw new Error(`Duplicate instruction number for ${instruction.id}`);
+    }
+    instructionKeys.add(key);
+  }
+}
+
+function assertContainedRange(
+  text: string,
+  range: TextRange,
+  parent: TextRange,
+  label: string,
+): void {
+  assertRange(text, range, label);
+  if (range.start < parent.start || range.end > parent.end) {
+    throw new Error(`${label} lies outside its parent range`);
   }
 }
 

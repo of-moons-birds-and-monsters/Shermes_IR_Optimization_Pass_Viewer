@@ -83,8 +83,7 @@ export interface UseFileDialogOptions {
 }
 const DEFAULT_OPTIONS: UseFileDialogOptions = {
   multiple: true,
-  accept: ".txt,.log,.dump,.ll",
-  //accept: "*",
+  accept: "",
 };
 
 export const useFileDialog: UseFileDialog = (
@@ -109,32 +108,31 @@ export const useFileDialog: UseFileDialog = (
     };
     return input;
   }, []);
-  inputRef.current = initFn();
-
   const open = async (localOptions?: Partial<UseFileDialogOptions>) => {
-    if (!inputRef.current) {
+    const input = inputRef.current ?? initFn();
+    if (!input) {
       return;
     }
+    inputRef.current = input;
     const _options = {
       ...DEFAULT_OPTIONS,
       ...options,
       ...localOptions,
     };
-    console.log("options: ", options);
-    console.log("localOptions: ", localOptions);
-    console.log("_options: ", _options);
 
-    inputRef.current.multiple = _options.multiple!;
-    inputRef.current.accept = _options.accept!;
+    input.multiple = _options.multiple ?? true;
+    input.accept = _options.accept ?? "";
     // Only set capture attribute if it's explicitly provided
     if (_options.capture !== undefined) {
-      inputRef.current.capture = _options.capture;
+      input.capture = _options.capture;
+    } else {
+      input.removeAttribute("capture");
     }
 
     fileOpenPromiseRef.current = new Promise((resolve) => {
       resolveFileOpenPromiseRef.current = resolve;
     });
-    inputRef.current.click();
+    input.click();
     return fileOpenPromiseRef.current;
   };
 

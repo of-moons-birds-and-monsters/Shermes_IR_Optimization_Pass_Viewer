@@ -1,6 +1,6 @@
 # Shermes IR Pass Viewer Dump Index Format
 
-Status: Draft, schema version 1  
+Status: Draft, schema version 2
 Project: Shermes IR Pass Viewer
 
 Shermes Version:
@@ -16,8 +16,8 @@ Pass Viewer. A dump index contains:
 - provenance about the parser and, when available, the compiler invocation;
 - ordered optimization trace segments and snapshots;
 - stable identities for functions found in the dump;
-- ranges locating each emitted function version and diagnostic in the embedded
-  dump text.
+- ranges locating each emitted function, basic-block, instruction version, and
+  diagnostic in the embedded dump text.
 
 The format is the seam between the dump parser and all consumers, including the
 browser viewer and possible future editor or desktop adapters. Consumers do not
@@ -46,7 +46,7 @@ The suggested file extension is:
 .shermes-ir-index.json
 ```
 
-No media type is registered for schema version 1. Tools MAY use
+No media type is registered for schema version 2. Tools MAY use
 `application/json`.
 
 ## 4. Versioning and compatibility
@@ -57,12 +57,12 @@ No media type is registered for schema version 1. Tools MAY use
 independent of the Shermes compiler version, release, Git commit, and dump
 grammar.
 
-Schema version 1 is represented by the JSON number `1`:
+Schema version 2 is represented by the JSON number `2`:
 
 ```json
 {
   "format": "shermes-ir-pass-viewer-dump-index",
-  "schemaVersion": 1
+  "schemaVersion": 2
 }
 ```
 
@@ -108,7 +108,7 @@ JSON escaping performed during serialization does not alter the logical value
 of `dump.text`. All ranges address the decoded string value, not byte positions
 in the serialized JSON file.
 
-Schema version 1 requires the input dump to be valid UTF-8. A producer MUST
+Schema version 2 requires the input dump to be valid UTF-8. A producer MUST
 report an input error rather than silently replacing invalid byte sequences.
 
 ### 5.2 Range encoding
@@ -137,7 +137,7 @@ For every range:
 
 Range boundaries MUST NOT divide a UTF-16 surrogate pair.
 
-Schema version 1 does not persist line and column positions. A consumer MAY
+Schema version 2 does not persist line and column positions. A consumer MAY
 build a line-start index and derive zero-based lines and UTF-16 columns for
 display or editor navigation.
 
@@ -166,17 +166,31 @@ digest.
 dump.text.slice(version.dumpRange.start, version.dumpRange.end);
 ```
 
+`InstructionVersion.contentSha256` is calculated from the UTF-8 encoding of
+the exact instruction line addressed by its `dumpRange`. The range excludes
+the line terminator and any preceding source-location comment.
+
+`BasicBlockVersion.contentSha256` hashes the ordered sequence of exact
+instruction lines in the block. Numbered and unnumbered instructions are both
+included. The block label, source-location comment lines, and line terminators
+are excluded. To encode the sequence unambiguously, each instruction line is
+encoded as UTF-8 and prefixed by its byte length as an unsigned 64-bit
+big-endian integer. SHA-256 is calculated over the concatenation of those
+length-prefixed byte strings. An empty block hashes the empty byte sequence.
+
 ## 6. Top-level structure
 
 ```ts
 type DumpIndex = {
   format: "shermes-ir-pass-viewer-dump-index";
-  schemaVersion: 1;
+  schemaVersion: 2;
   producer: Producer;
   dump: EmbeddedDump;
   traceSegments: TraceSegment[];
   functions: FunctionIdentity[];
   functionVersions: FunctionVersion[];
+  basicBlockVersions: BasicBlockVersion[];
+  instructionVersions: InstructionVersion[];
   diagnostics: Diagnostic[];
   warnings?: ParseWarning[];
 };
@@ -185,7 +199,7 @@ type DumpIndex = {
 All required arrays MUST be present even when empty.
 
 The top-level `format` discriminator protects against accidentally opening an
-unrelated JSON document that happens to contain `schemaVersion: 1`.
+unrelated JSON document that happens to contain `schemaVersion: 2`.
 
 ## 7. Producer provenance
 
@@ -250,7 +264,7 @@ type EmbeddedDump = {
 };
 ```
 
-Schema version 1 supports only an embedded dump. External-file references,
+Schema version 2 supports only an embedded dump. External-file references,
 compression, and chunked backing stores are not part of this version.
 
 ## 9. Identifiers and references
@@ -261,6 +275,8 @@ The following entities have string identifiers:
 - snapshots;
 - functions;
 - function versions;
+- basic-block versions;
+- instruction versions;
 - diagnostics;
 - parse warnings.
 
@@ -406,7 +422,7 @@ Requirements:
   function.
 - `firstHeaderRange` MUST address that earliest printed header.
 
-Schema version 1 assumes one continuous Shermes compilation/module identity per
+Schema version 2 assumes one continuous Shermes compilation/module identity per
 dump index. If a parser detects concatenated unrelated dumps whose internal
 function-name namespaces may collide, it MUST reject the input or emit separate
 `DumpIndex` documents.
@@ -446,7 +462,95 @@ order and then by their appearance within that snapshot. Consumers MUST use
 identifier references and ranges rather than relying on this order for
 correctness.
 
-## 14. Diagnostics and unclassified text
+## 14. Basic-block versions
+
+```ts
+type BasicBlockVersion = {
+  id: string;
+  functionVersionId: string;
+  functionId: string;
+  snapshotId: string;
+  number: number;
+  ordinal: number;
+  dumpRange: TextRange;
+  contentSha256: string;
+};
+```
+
+A basic-block version represents one numbered basic block emitted within one
+function version. Its identity across snapshots is the pair `(functionId,
+number)`; a block number alone is not globally unique.
+
+Requirements:
+
+- `functionVersionId`, `functionId`, and `snapshotId` MUST resolve to mutually
+  consistent containing entities.
+- At most one basic-block version MAY reference a given pair of
+  `functionVersionId` and `number`.
+- `number` MUST be the non-negative integer printed by the `%BB<number>:`
+  declaration and MUST be exactly representable as an IEEE-754 safe integer.
+- `ordinal` MUST be the block's zero-based position within its function
+  version. Block ordinals MUST be contiguous.
+- `dumpRange` MUST begin at `%` in the block declaration and end immediately
+  before the next block declaration or `function_end`. It includes instruction
+  lines, source-location comments, and intervening line endings in the source
+  dump even though not all of that text contributes to `contentSha256`.
+- `dumpRange` MUST be contained by the referenced function version's
+  `dumpRange`.
+- `contentSha256` MUST use the block-content encoding defined in section 5.4.
+
+Basic-block versions SHOULD follow function-version and block dump order.
+
+## 15. Instruction versions
+
+```ts
+type InstructionVersion = {
+  id: string;
+  functionVersionId: string;
+  functionId: string;
+  snapshotId: string;
+  number: number;
+  basicBlockNumber: number;
+  ordinalInBlock: number;
+  dumpRange: TextRange;
+  contentSha256: string;
+};
+```
+
+An instruction version represents a selectable instruction whose destination
+number is printed as `%<number>`. Its identity across snapshots is the pair
+`(functionId, number)`; an instruction number alone is not globally unique.
+
+Requirements:
+
+- `functionVersionId`, `functionId`, and `snapshotId` MUST resolve to mutually
+  consistent containing entities.
+- `basicBlockNumber` MUST identify a basic-block version in the same function
+  version.
+- At most one instruction version MAY reference a given pair of
+  `functionVersionId` and `number`.
+- `number` MUST be the non-negative integer in the instruction's leading
+  `%<number> =` destination and MUST be exactly representable as an IEEE-754
+  safe integer.
+- `ordinalInBlock` MUST be the instruction's zero-based position among all
+  instructions in its block, including instructions without printed
+  destination numbers.
+- `dumpRange` MUST address the exact instruction line without its line
+  terminator or any preceding source-location comment. Leading and trailing
+  whitespace on the instruction line are included.
+- `dumpRange` MUST be contained by both the referenced function and block
+  ranges.
+- `contentSha256` MUST use the instruction-content encoding defined in section
+  5.4.
+
+Instructions without printed destination numbers MUST contribute to their
+block's content hash and to subsequent `ordinalInBlock` values, but MUST NOT be
+assigned synthetic `InstructionVersion` identities.
+
+Instruction versions SHOULD follow function-version, block, and instruction
+dump order.
+
+## 16. Diagnostics and unclassified text
 
 ```ts
 type Diagnostic = {
@@ -469,7 +573,7 @@ Requirements:
 - Failure to recognize diagnostic text does not permit a producer to discard
   it; it remains preserved in `dump.text`.
 
-## 15. Parser warnings
+## 17. Parser warnings
 
 ```ts
 type ParseWarning = {
@@ -495,10 +599,10 @@ Examples of warning conditions include:
 - a present/absent/present gap for one function within a module trace;
 - a range or heading that was recovered heuristically.
 
-## 16. Derived function lifecycle
+## 18. Derived function lifecycle
 
 Lifecycle states used by the viewer are derived from stored facts. They are not
-persisted as authoritative fields in schema version 1.
+persisted as authoritative fields in schema version 2.
 
 For a function in a module-scoped trace:
 
@@ -532,9 +636,9 @@ within a module-scoped trace is inconsistent with that behavior. A parser
 SHOULD preserve the observations and emit a warning rather than substituting a
 function version or classifying the gap as unchanged.
 
-## 17. Validation invariants
+## 19. Validation invariants
 
-A conforming schema-version-1 document satisfies all of the following:
+A conforming schema-version-2 document satisfies all of the following:
 
 1. `format` and `schemaVersion` have their required literal values.
 2. `dump.textSha256` matches `dump.text`.
@@ -551,23 +655,29 @@ A conforming schema-version-1 document satisfies all of the following:
 12. No snapshot contains two versions of the same function identity.
 13. Every function's `firstSeenSnapshotId` and `firstHeaderRange` identify its
     earliest emitted version.
+14. Every block and instruction reference resolves to mutually consistent
+    containing entities.
+15. Every block and instruction range is contained by its documented parent
+    ranges.
+16. Block and instruction ordinals follow their documented ordering rules.
+17. Every block and instruction content hash matches its normative encoding.
 
 A consumer MAY continue with a document containing non-fatal parser warnings,
 but it MUST reject violated structural invariants that make identifier or range
 resolution unsafe.
 
-## 18. Example
+## 20. Example
 
 This example satisfies the range and hash requirements of the format.
 
 ```json
 {
   "format": "shermes-ir-pass-viewer-dump-index",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "producer": {
     "parser": {
       "name": "ir-pass-viewer",
-      "version": "0.1.0"
+      "version": "0.2.0"
     },
     "compiler": {
       "reportedVersion": "Static Hermes JS Compiler v0.0",
@@ -623,13 +733,26 @@ This example satisfies the range and hash requirements of the format.
       "contentSha256": "2d5e91a80b58fc97511c2c456330a185977b0067e1ea721cd35d86fd343b616a"
     }
   ],
+  "basicBlockVersions": [
+    {
+      "id": "basic-block-version-0",
+      "functionVersionId": "function-version-0",
+      "functionId": "function-0",
+      "snapshotId": "snapshot-0-0",
+      "number": 0,
+      "ordinal": 0,
+      "dumpRange": { "start": 47, "end": 92 },
+      "contentSha256": "b56ffad7743d6c3b0f50db3a654d90f58af4f0fdeda676759165aacef280d8bc"
+    }
+  ],
+  "instructionVersions": [],
   "diagnostics": []
 }
 ```
 
-## 19. Deferred features
+## 21. Deferred features
 
-The following are deliberately outside schema version 1:
+The following are deliberately outside schema version 2:
 
 - external or lazily loaded dump backing files;
 - compressed or chunked dump storage;

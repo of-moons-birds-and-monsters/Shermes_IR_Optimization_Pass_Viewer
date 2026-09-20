@@ -9,6 +9,16 @@ function sha256(text: string): string {
   return createHash("sha256").update(text, "utf8").digest("hex");
 }
 
+function sha256InstructionLines(lines: string[]): string {
+  const chunks = lines.flatMap((line) => {
+    const bytes = Buffer.from(line, "utf8");
+    const length = Buffer.alloc(8);
+    length.writeBigUInt64BE(BigInt(bytes.length));
+    return [length, bytes];
+  });
+  return createHash("sha256").update(Buffer.concat(chunks)).digest("hex");
+}
+
 test("indexes one function in one initial snapshot without changing its text", async () => {
   const dump = [
     "*** INITIAL STATE",
@@ -23,7 +33,7 @@ test("indexes one function in one initial snapshot without changing its text", a
   const index = await buildDumpIndex(encoder.encode(dump));
 
   assert.equal(index.format, "shermes-ir-pass-viewer-dump-index");
-  assert.equal(index.schemaVersion, 1);
+  assert.equal(index.schemaVersion, 2);
   assert.equal(index.dump.text, dump);
   assert.equal(index.dump.textSha256, sha256(dump));
   assert.equal(index.traceSegments.length, 1);
@@ -59,6 +69,92 @@ test("indexes one function in one initial snapshot without changing its text", a
   );
   assert.deepEqual(index.diagnostics, []);
   assert.deepEqual(index.warnings, []);
+});
+
+test("indexes basic blocks and only numbered instructions while hashing every instruction", async () => {
+  const dump = [
+    "*** INITIAL STATE",
+    "",
+    "function main(): undefined",
+    "%BB0:",
+    "; input.ts:1:1",
+    "  %0 = LoadConstInst (:number) 1: number",
+    "       StoreStackInst %0: number, %1",
+    "%BB1:",
+    "       ReturnInst undefined: undefined",
+    "function_end",
+    "",
+  ].join("\n");
+
+  const index = await buildDumpIndex(encoder.encode(dump));
+  const functionVersion = index.functionVersions[0];
+
+  assert.equal(index.schemaVersion, 2);
+  assert.equal(index.basicBlockVersions.length, 2);
+  assert.equal(index.instructionVersions.length, 1);
+
+  const [firstBlock, secondBlock] = index.basicBlockVersions;
+  assert.deepEqual(
+    {
+      functionVersionId: firstBlock.functionVersionId,
+      functionId: firstBlock.functionId,
+      snapshotId: firstBlock.snapshotId,
+      number: firstBlock.number,
+      ordinal: firstBlock.ordinal,
+    },
+    {
+      functionVersionId: functionVersion.id,
+      functionId: functionVersion.functionId,
+      snapshotId: functionVersion.snapshotId,
+      number: 0,
+      ordinal: 0,
+    },
+  );
+  assert.equal(secondBlock.number, 1);
+  assert.equal(secondBlock.ordinal, 1);
+  assert.equal(
+    dump.slice(firstBlock.dumpRange.start, firstBlock.dumpRange.end),
+    [
+      "%BB0:",
+      "; input.ts:1:1",
+      "  %0 = LoadConstInst (:number) 1: number",
+      "       StoreStackInst %0: number, %1",
+    ].join("\n") + "\n",
+  );
+
+  const instruction = index.instructionVersions[0];
+  assert.equal(instruction.number, 0);
+  assert.equal(instruction.basicBlockNumber, 0);
+  assert.equal(instruction.ordinalInBlock, 0);
+  assert.equal(
+    dump.slice(instruction.dumpRange.start, instruction.dumpRange.end),
+    "  %0 = LoadConstInst (:number) 1: number",
+  );
+  assert.equal(instruction.contentSha256, sha256("  %0 = LoadConstInst (:number) 1: number"));
+  assert.equal(
+    firstBlock.contentSha256,
+    sha256InstructionLines([
+      "  %0 = LoadConstInst (:number) 1: number",
+      "       StoreStackInst %0: number, %1",
+    ]),
+  );
+});
+
+test("rejects IR numbers that cannot be represented without loss", async () => {
+  const dump = [
+    "*** INITIAL STATE",
+    "",
+    "function main(): undefined",
+    "%BB999999999999999999999999:",
+    "       ReturnInst undefined: undefined",
+    "function_end",
+    "",
+  ].join("\n");
+
+  await assert.rejects(
+    buildDumpIndex(encoder.encode(dump)),
+    /basic block number.*exceeds the safe integer range/,
+  );
 });
 
 test("keeps repeated pass invocations and trace segments distinct", async () => {

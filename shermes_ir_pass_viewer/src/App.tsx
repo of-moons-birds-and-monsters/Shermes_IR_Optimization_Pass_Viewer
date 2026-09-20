@@ -1,4 +1,11 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import "./App.css";
 import { IrDiffEditor } from "./Editor";
 import {
@@ -6,6 +13,13 @@ import {
   type UseFileDialogOptions,
 } from "./hooks/useFileDialog";
 import { buildDumpIndex, type DumpIndex } from "../../src/dump_parser";
+import {
+  createElementNavigation,
+  parseElementReference,
+  type ElementChange,
+  type ElementNavigation,
+  type IrElementRef,
+} from "../../src/element_navigation";
 import {
   advanceSelectionsToNextDifference,
   advanceSelectionsTogether,
@@ -29,7 +43,7 @@ interface AppSettings {
 }
 
 const appSettings: AppSettings = {
-  useFileDialog: { multiple: false, accept: ".txt,.log,.dump" },
+  useFileDialog: { multiple: false, accept: ".txt,.log,.dump,.ll" },
 };
 
 type SideSelectorProps = {
@@ -167,6 +181,7 @@ function App() {
   const [loadedDump, setLoadedDump] = useState<{
     index: DumpIndex;
     cache: DumpNavigationCache;
+    elementNavigation: ElementNavigation;
   }>();
   const [before, setBefore] = useState<Selection>();
   const [after, setAfter] = useState<Selection>();
@@ -176,6 +191,14 @@ function App() {
   const [timelineCollapsed, setTimelineCollapsed] = useState(false);
   const [sideSelectorsCollapsed, setSideSelectorsCollapsed] = useState(false);
   const timelineTrackRef = useRef<HTMLDivElement>(null);
+  const [elementInput, setElementInput] = useState("");
+  const [selectedElement, setSelectedElement] = useState<{
+    target: IrElementRef;
+    traceId: string;
+    initialAnchorSnapshotId?: string;
+  }>();
+  const [lastElementChange, setLastElementChange] = useState<ElementChange>();
+  const [elementInputError, setElementInputError] = useState<string>();
 
   useEffect(() => {
     const file = files?.[0];
@@ -190,12 +213,17 @@ function App() {
       .then((nextIndex) => {
         if (cancelled) return;
         const nextCache = createDumpNavigationCache(nextIndex);
+        const elementNavigation = createElementNavigation(nextIndex);
         const selections = defaultSelections(nextIndex, nextCache);
         setError(undefined);
-        setLoadedDump({ index: nextIndex, cache: nextCache });
+        setLoadedDump({ index: nextIndex, cache: nextCache, elementNavigation });
         setBefore(selections?.before);
         setAfter(selections?.after);
         setFileName(file.name);
+        setElementInput("");
+        setSelectedElement(undefined);
+        setLastElementChange(undefined);
+        setElementInputError(undefined);
       })
       .catch((reason: unknown) => {
         if (!cancelled) {
@@ -214,6 +242,7 @@ function App() {
 
   const index = loadedDump?.index;
   const cache = loadedDump?.cache;
+  const elementNavigation = loadedDump?.elementNavigation;
   const beforeFunctionId = before?.functionId;
   const afterFunctionId = after?.functionId;
 
@@ -264,6 +293,50 @@ function App() {
   const timeline = activeTrace
     ? (activeTimelines.get(activeTrace.id) ?? [])
     : [];
+
+  const applicableSelectedElement =
+    selectedElement &&
+    before?.functionId === selectedElement.target.functionId &&
+    after?.functionId === selectedElement.target.functionId &&
+    beforeTrace?.id === selectedElement.traceId &&
+    afterTrace?.id === selectedElement.traceId
+      ? selectedElement
+      : undefined;
+
+  const clearElementSelection = () => {
+    setSelectedElement(undefined);
+    setLastElementChange(undefined);
+  };
+
+  const updateBefore = (selection: Selection) => {
+    if (
+      selectedElement &&
+      (selection.functionId !== selectedElement.target.functionId ||
+        cache?.snapshotIdToTrace.get(selection.snapshotId)?.id !==
+          selectedElement.traceId)
+    ) {
+      clearElementSelection();
+    } else if (selectedElement) {
+      setSelectedElement({ ...selectedElement, initialAnchorSnapshotId: undefined });
+      setLastElementChange(undefined);
+    }
+    setBefore(selection);
+  };
+
+  const updateAfter = (selection: Selection) => {
+    if (
+      selectedElement &&
+      (selection.functionId !== selectedElement.target.functionId ||
+        cache?.snapshotIdToTrace.get(selection.snapshotId)?.id !==
+          selectedElement.traceId)
+    ) {
+      clearElementSelection();
+    } else if (selectedElement) {
+      setSelectedElement({ ...selectedElement, initialAnchorSnapshotId: undefined });
+      setLastElementChange(undefined);
+    }
+    setAfter(selection);
+  };
 
   useLayoutEffect(() => {
     const track = timelineTrackRef.current;
@@ -328,8 +401,8 @@ function App() {
   const selectTimelineEntry = (entry: TimelineEntry) => {
     if (!activeSelection) return;
     const selection = { ...activeSelection, snapshotId: entry.snapshot.id };
-    if (activeSide === "before") setBefore(selection);
-    else setAfter(selection);
+    if (activeSide === "before") updateBefore(selection);
+    else updateAfter(selection);
   };
 
   const stepTimeline = (offset: -1 | 1) => {
@@ -359,29 +432,129 @@ function App() {
   const advanceBoth = () => {
     if (!nextSelections) return;
 
-    setAfter(nextSelections.after);
-    setBefore(nextSelections.before);
+    updateAfter(nextSelections.after);
+    updateBefore(nextSelections.before);
   };
 
   const goToPreviousDifference = () => {
     if (!previousDifferenceSelections) return;
-    setBefore(previousDifferenceSelections.before);
-    setAfter(previousDifferenceSelections.after);
+    updateBefore(previousDifferenceSelections.before);
+    updateAfter(previousDifferenceSelections.after);
   };
   const advanceToNextDifference = () => {
     if (!nextDifferenceSelections) return;
-    setBefore(nextDifferenceSelections.before);
-    setAfter(nextDifferenceSelections.after);
+    updateBefore(nextDifferenceSelections.before);
+    updateAfter(nextDifferenceSelections.after);
   };
+  const selectElementReference = useCallback(
+    (side: ComparisonSide, reference: string) => {
+      if (!cache) return;
+      const selection = side === "before" ? before : after;
+      if (!selection) return;
+      const trace = cache.snapshotIdToTrace.get(selection.snapshotId);
+      const target = parseElementReference(reference, selection.functionId);
+      if (!trace || !target) return;
+      setActiveSide(side);
+      setElementInput(reference);
+      setSelectedElement({
+        target,
+        traceId: trace.id,
+        initialAnchorSnapshotId: selection.snapshotId,
+      });
+      setLastElementChange(undefined);
+      setElementInputError(undefined);
+    },
+    [after, before, cache],
+  );
+
+  const selectElementFromInput = () => {
+    if (!activeSelection || !activeTrace) return;
+    const target = parseElementReference(elementInput, activeSelection.functionId);
+    if (!target) {
+      setSelectedElement(undefined);
+      setLastElementChange(undefined);
+      setElementInputError("Use %72 for an instruction or %BB11 for a block");
+      return;
+    }
+    setSelectedElement({
+      target,
+      traceId: activeTrace.id,
+      initialAnchorSnapshotId: activeSelection.snapshotId,
+    });
+    setElementInput(
+      target.kind === "basic-block" ? `%BB${target.number}` : `%${target.number}`,
+    );
+    setLastElementChange(undefined);
+    setElementInputError(undefined);
+  };
+
+  const previousElementChange = useMemo(
+    () =>
+      applicableSelectedElement && elementNavigation && before
+        ? elementNavigation.findElementChange(
+            applicableSelectedElement.target,
+            applicableSelectedElement.initialAnchorSnapshotId ?? before.snapshotId,
+            "previous",
+          )
+        : undefined,
+    [applicableSelectedElement, before, elementNavigation],
+  );
+  const nextElementChange = useMemo(
+    () =>
+      applicableSelectedElement && elementNavigation && after
+        ? elementNavigation.findElementChange(
+            applicableSelectedElement.target,
+            applicableSelectedElement.initialAnchorSnapshotId ?? after.snapshotId,
+            "next",
+          )
+        : undefined,
+    [after, applicableSelectedElement, elementNavigation],
+  );
+
+  const applyElementChange = (change: ElementChange | undefined) => {
+    if (!change || !applicableSelectedElement) return;
+    setBefore({
+      functionId: applicableSelectedElement.target.functionId,
+      snapshotId: change.beforeSnapshotId,
+    });
+    setAfter({
+      functionId: applicableSelectedElement.target.functionId,
+      snapshotId: change.afterSnapshotId,
+    });
+    setSelectedElement({
+      ...applicableSelectedElement,
+      initialAnchorSnapshotId: undefined,
+    });
+    setLastElementChange(change);
+  };
+
+  const beforeElementOccurrence =
+    applicableSelectedElement && elementNavigation && before
+      ? elementNavigation.findOccurrence(applicableSelectedElement.target, before.snapshotId)
+      : undefined;
+  const afterElementOccurrence =
+    applicableSelectedElement && elementNavigation && after
+      ? elementNavigation.findOccurrence(applicableSelectedElement.target, after.snapshotId)
+      : undefined;
+  const beforeElementOffset =
+    beforeElementOccurrence && beforeEntry?.version
+      ? beforeElementOccurrence.version.dumpRange.start -
+        beforeEntry.version.dumpRange.start
+      : undefined;
+  const afterElementOffset =
+    afterElementOccurrence && afterEntry?.version
+      ? afterElementOccurrence.version.dumpRange.start -
+        afterEntry.version.dumpRange.start
+      : undefined;
   // NOTE: do not memoize these objects, or else this breaks and risks stale data.
   const matchAfter = () =>
-    setBefore({
+    updateBefore({
       functionId: after!.functionId,
       snapshotId: before!.snapshotId,
     });
 
   const matchBefore = () =>
-    setAfter({
+    updateAfter({
       functionId: before!.functionId,
       snapshotId: after!.snapshotId,
     });
@@ -429,7 +602,7 @@ function App() {
                   selection={before}
                   active={activeSide === "before"}
                   onActivate={() => setActiveSide("before")}
-                  onChange={setBefore}
+                  onChange={updateBefore}
                   matchOtherSide={matchAfter}
                 />
                 <SideSelector
@@ -440,7 +613,7 @@ function App() {
                   selection={after}
                   active={activeSide === "after"}
                   onActivate={() => setActiveSide("after")}
-                  onChange={setAfter}
+                  onChange={updateAfter}
                   matchOtherSide={matchBefore}
                 />
               </>
@@ -458,6 +631,33 @@ function App() {
               <div className="timeline__heading-actions">
                 {!timelineCollapsed && (
                   <div className="timeline__navigation">
+                    <label className="element-navigation__input">
+                      IR element
+                      <input
+                        value={elementInput}
+                        placeholder="%72 or %BB11"
+                        onChange={(event) => {
+                          setElementInput(event.target.value);
+                          setElementInputError(undefined);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") selectElementFromInput();
+                        }}
+                      />
+                    </label>
+                    <button onClick={selectElementFromInput}>Select element</button>
+                    <button
+                      disabled={!previousElementChange}
+                      onClick={() => applyElementChange(previousElementChange)}
+                    >
+                      Previous element change
+                    </button>
+                    <button
+                      disabled={!nextElementChange}
+                      onClick={() => applyElementChange(nextElementChange)}
+                    >
+                      Next element change
+                    </button>
                     <button onClick={() => stepTimeline(-1)}>
                       Previous snapshot
                     </button>
@@ -498,39 +698,69 @@ function App() {
               </div>
             </div>
             {!timelineCollapsed && (
-              <div className="timeline__track" ref={timelineTrackRef}>
-                {timeline.map((entry) => {
-                  const isBeforeSelection =
-                    beforeTrace?.id === activeTrace?.id &&
-                    entry.snapshot.id === before?.snapshotId;
-                  const isAfterSelection =
-                    afterTrace?.id === activeTrace?.id &&
-                    entry.snapshot.id === after?.snapshotId;
-                  const isComparisonSelection =
-                    isBeforeSelection || isAfterSelection;
-                  return (
-                    <button
-                      key={entry.snapshot.id}
-                      className={`timeline__entry timeline__entry--${entry.status}${
-                        isComparisonSelection
-                          ? " timeline__entry--comparison-selected"
-                          : ""
-                      }${
-                        entry.snapshot.id === activeSelection?.snapshotId
-                          ? " timeline__entry--selected"
-                          : ""
-                      }`}
-                      title={`${snapshotLabel(entry.snapshot)}: ${entry.status}${
-                        isBeforeSelection ? " · Before" : ""
-                      }${isAfterSelection ? " · After" : ""}`}
-                      onClick={() => selectTimelineEntry(entry)}
-                    >
-                      <span className="timeline__marker" />
-                      <span>{snapshotLabel(entry.snapshot)}</span>
-                    </button>
-                  );
-                })}
-              </div>
+              <>
+                {elementInputError && (
+                  <div className="element-navigation__status element-navigation__status--error">
+                    {elementInputError}
+                  </div>
+                )}
+                {applicableSelectedElement && (
+                  <div className="element-navigation__status">
+                    Selected {applicableSelectedElement.target.kind === "basic-block" ? "block" : "instruction"}{" "}
+                    {applicableSelectedElement.target.kind === "basic-block" ? "%BB" : "%"}
+                    {applicableSelectedElement.target.number}
+                    {lastElementChange &&
+                    lastElementChange.beforeSnapshotId === before?.snapshotId &&
+                    lastElementChange.afterSnapshotId === after?.snapshotId
+                      ? ` · ${lastElementChange.reasons.join(", ")}`
+                        : beforeElementOccurrence && !afterElementOccurrence
+                          ? " · absent from After"
+                          : !beforeElementOccurrence && afterElementOccurrence
+                            ? " · absent from Before"
+                            : beforeElementOccurrence && afterElementOccurrence
+                              ? ""
+                          : elementNavigation?.hasElementInTrace(
+                                applicableSelectedElement.target,
+                                applicableSelectedElement.traceId,
+                              )
+                            ? " · absent from both selected snapshots"
+                            : " · never observed in this function and trace"}
+                  </div>
+                )}
+                <div className="timeline__track" ref={timelineTrackRef}>
+                  {timeline.map((entry) => {
+                    const isBeforeSelection =
+                      beforeTrace?.id === activeTrace?.id &&
+                      entry.snapshot.id === before?.snapshotId;
+                    const isAfterSelection =
+                      afterTrace?.id === activeTrace?.id &&
+                      entry.snapshot.id === after?.snapshotId;
+                    const isComparisonSelection =
+                      isBeforeSelection || isAfterSelection;
+                    return (
+                      <button
+                        key={entry.snapshot.id}
+                        className={`timeline__entry timeline__entry--${entry.status}${
+                          isComparisonSelection
+                            ? " timeline__entry--comparison-selected"
+                            : ""
+                        }${
+                          entry.snapshot.id === activeSelection?.snapshotId
+                            ? " timeline__entry--selected"
+                            : ""
+                        }`}
+                        title={`${snapshotLabel(entry.snapshot)}: ${entry.status}${
+                          isBeforeSelection ? " · Before" : ""
+                        }${isAfterSelection ? " · After" : ""}`}
+                        onClick={() => selectTimelineEntry(entry)}
+                      >
+                        <span className="timeline__marker" />
+                        <span>{snapshotLabel(entry.snapshot)}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </section>
 
@@ -538,6 +768,9 @@ function App() {
             <IrDiffEditor
               original={functionText(index, beforeEntry)}
               modified={functionText(index, afterEntry)}
+              originalElementOffset={beforeElementOffset}
+              modifiedElementOffset={afterElementOffset}
+              onSelectElement={selectElementReference}
             />
           </section>
         </>
