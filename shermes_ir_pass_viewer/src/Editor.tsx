@@ -23,7 +23,7 @@ export function IrDiffEditor({
       original={original}
       modified={modified}
       language="llvm"
-      theme="vs-dark"
+      //theme="vs-dark"
       onMount={handleMount}
       options={{
         automaticLayout: true,

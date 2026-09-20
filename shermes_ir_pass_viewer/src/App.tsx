@@ -5,10 +5,7 @@ import {
   useFileDialog,
   type UseFileDialogOptions,
 } from "./hooks/useFileDialog";
-import {
-  buildDumpIndex,
-  type DumpIndex,
-} from "../../src/dump_parser";
+import { buildDumpIndex, type DumpIndex } from "../../src/dump_parser";
 import {
   advanceSelectionsToNextDifference,
   advanceSelectionsTogether,
@@ -163,6 +160,7 @@ function statusMessage(entry: TimelineEntry): string {
       return "Function present";
   }
 }
+
 function App() {
   const [files, open] = useFileDialog(appSettings.useFileDialog);
   const [loadedDump, setLoadedDump] = useState<{
@@ -224,16 +222,14 @@ function App() {
         : new Map<string, TimelineEntry[]>(),
     [index, beforeFunctionId, cache],
   );
-  const afterTimelines = useMemo(
-    () => {
-      if (!index || !afterFunctionId || !cache) {
-        return new Map<string, TimelineEntry[]>();
-      }
-      return afterFunctionId === beforeFunctionId
-        ? beforeTimelines
-        : createFunctionTimelines(index, afterFunctionId, cache);
-    }, [index, afterFunctionId, beforeFunctionId, cache, beforeTimelines],
-  );
+  const afterTimelines = useMemo(() => {
+    if (!index || !afterFunctionId || !cache) {
+      return new Map<string, TimelineEntry[]>();
+    }
+    return afterFunctionId === beforeFunctionId
+      ? beforeTimelines
+      : createFunctionTimelines(index, afterFunctionId, cache);
+  }, [index, afterFunctionId, beforeFunctionId, cache, beforeTimelines]);
   const beforeTrace =
     cache && before
       ? findTraceForSnapshot(before.snapshotId, cache)
@@ -241,9 +237,13 @@ function App() {
   const afterTrace =
     cache && after ? findTraceForSnapshot(after.snapshotId, cache) : undefined;
   const beforePosition =
-    before && cache ? cache.snapshotIdToPosition.get(before.snapshotId) : undefined;
+    before && cache
+      ? cache.snapshotIdToPosition.get(before.snapshotId)
+      : undefined;
   const afterPosition =
-    after && cache ? cache.snapshotIdToPosition.get(after.snapshotId) : undefined;
+    after && cache
+      ? cache.snapshotIdToPosition.get(after.snapshotId)
+      : undefined;
   const beforeEntry =
     beforeTrace && beforePosition !== undefined
       ? beforeTimelines.get(beforeTrace.id)?.[beforePosition]
@@ -257,8 +257,11 @@ function App() {
     cache && activeSelection
       ? findTraceForSnapshot(activeSelection.snapshotId, cache)
       : undefined;
-  const activeTimelines = activeSide === "before" ? beforeTimelines : afterTimelines;
-  const timeline = activeTrace ? (activeTimelines.get(activeTrace.id) ?? []) : [];
+  const activeTimelines =
+    activeSide === "before" ? beforeTimelines : afterTimelines;
+  const timeline = activeTrace
+    ? (activeTimelines.get(activeTrace.id) ?? [])
+    : [];
 
   const selectTimelineEntry = (entry: TimelineEntry) => {
     if (!activeSelection) return;
