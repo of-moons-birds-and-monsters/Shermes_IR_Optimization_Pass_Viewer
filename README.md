@@ -5,11 +5,29 @@ AI-Slopping up some dumps.
 This is a simple web app that lets you view the output of Shermes '-Xdump-between-passes' in a more convenient and interactive way.
 Sloppin' it up and is work in progress but it does work and has some basic features.
 
+Uses Vite 8 so requires Node.js ^20.19.0 >= 22.12.0
+
 ## Usage
 
+**Dumps are not uploaded anywhere, this app runs purelly locally**
+
 1. Dump the IR optimization pass output via `-Xdump-between-passes`
-2. Start the web app with `npm run dev` (uses vite)
+2. cd into ir_pass_viewer Start the web app with `npm run dev` (uses vite)
 3. Open the dump file via "Open dump file" button
+
+- file picker takes .txt .log .dump or .ll files
+- files are parsed in the browser so especially large files could slow down the app
+
+**Dumping with Shermes**
+You must capture both stdout and stderr to get the dump.
+
+```
+  ./debug_build/bin/shermes \
+    -typed \
+    -Xdump-between-passes \
+    input.ts \
+    > output.dump 2>&1
+```
 
 ## Terms
 
@@ -42,15 +60,60 @@ Multiple optimization passes can happen multiple times over the course of a trac
 
 ## Features
 
-To select a function to view use the Function dropdown
-You can select a particular functions particular optimization output with the "Snapshot" drop down
-This dropdown will also show the [trace](##Terms) a particular snapshot belongs
+The UI is a diff viewer, it displays to Monaco editors for the before and after code along with function and snapshot selections, a timeline, and various navigation buttons.
+
+**The Editors**
+
+- Monaco is the open source core editor component used by VSCode.
+- The left side is the "Before" code, the right side is the "After" code.
+- Each pane can independently select a function and snapshot to view.
+- Clicking a pane will make it the active pane.
+- The active pane has a highlighted border.
+- The active pane determines which timeline is shown.
+- Timeline controls based on selected active pane.
+
+**The Timeline**
+
+- Entries are [snapshots](#terms) in [dump](#terms) order within one trace.
+- Before and After selections are marked on the timeline.
+- Clicking a timeline entry changes the active sides snapshot
+
+**Function and Snapshot Selection**
+
+- To select a function to view use the Function dropdown
+- You can select a particular functions particular optimization output with the "Snapshot" drop down
+- This dropdown will also show the [trace](#terms) a particular snapshot belongs
 
 To have one diff window function match the other click the "Match before/after" button to have that diff windows function match the other ones
-
 That button will not match the trace, only the function. You must manually select the Snapshot to be on the same trace if you want those navigation
 features to work (trace matching button will be added shortly)
 
+Within the drop you will see various snapshots labeld with states
+
+```
+present
+changed
+unchanged
+introduced
+removed
+unavailable
+unreachable
+unknown
+```
+
+- **unavailable**: the function was not emitted in this trace/snapshot, but removal cannot be inferred.
+- **unknown**: the dump contains an ambiguous or inconsistent lifecycle gap.
+- **introduced**: absent from the preceding snapshot and present in the current
+  snapshot;
+- **unchanged**: present in both snapshots with equal `contentSha256` values;
+- **changed**: present in both snapshots with different `contentSha256` values;
+- **removed**: present in the preceding snapshot and absent from the current
+  snapshot;
+- **unreachable**: present with `FunctionVersion.unreachable` set to true.
+
+missing **present** and **unknown**
+
+**Navigation**
 In order for the Next Element Change, Previous Element Change, Advance to Next Difference , and Go to previous difference to work you must
 be on the same function AND the same trace in both diff windows.
 
@@ -97,3 +160,4 @@ Coming soon:
 - trace matching button
 
 better UI.
+The options menu needs so much work, I cannot do shaders and I cannot get AI to do the shaders for me well so it does not match well.
