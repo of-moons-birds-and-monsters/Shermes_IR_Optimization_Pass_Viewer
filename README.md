@@ -5,6 +5,8 @@ AI-Slopping up some dumps.
 This is a simple web app that lets you view the output of Shermes '-Xdump-between-passes' in a more convenient and interactive way.
 Sloppin' it up and is work in progress but it does work and has some basic features.
 
+It is used for debugging Shermes optimizer transformations
+
 Uses Vite 8 so requires Node.js ^20.19.0 >= 22.12.0
 
 ## Usage
@@ -34,6 +36,7 @@ You must capture stderr to get the dump outputs. The pass content is written bas
 ## Terms
 
 **dump**: the output of `-Xdump-between-passes`
+
 **index**: the index of the dump
 
 **snapshots**: the output IR of a specific optimization pass being run on a function or multiple functions. A module scoped snapshot could contain the entire module.
@@ -275,7 +278,7 @@ other languages easier.
 (There are not any ts only things embedded into the spec, aside from strings with a built in length field I guess)
 
 There is a separate spec for some of the navigation features `ELEMENT_NAVIGATION.md`
-It tries to define things like "what are changes between basic block" in a basic way:w
+It tries to define things like "what are changes between basic block" in a basic way
 
 3. Dump Index Specification `DUMP_INDEX_FORMAT.md`
    This is the parser output spec.
