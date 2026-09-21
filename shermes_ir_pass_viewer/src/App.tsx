@@ -8,6 +8,7 @@ import {
   memo,
 } from "react";
 import { createPortal } from "react-dom";
+import { ShaderBackground } from "./ShaderBackground";
 import "./App.css";
 import { IrDiffEditor } from "./Editor";
 import {
@@ -194,147 +195,7 @@ type ThemeSelectorProps = {
 type OptionsWindowProps = ThemeSelectorProps & {
   toggleOptionsWindow: () => void;
 };
-const OptionsVertexShader = `#version 300 es
 
-  const vec2 positions[3] = vec2[](
-    vec2(-1.0, -1.0),
-    vec2( 3.0, -1.0),
-    vec2(-1.0,  3.0)
-  );
-
-  void main() {
-    gl_Position = vec4(positions[gl_VertexID], 0.0, 1.0);
-  }`;
-const OptionsFragmentShader = `#version 300 es
-  precision highp float;
-
-  uniform vec2 u_resolution;
-  uniform float u_time;
-
-  out vec4 outputColor;
-
-  void main() {
-    vec2 uv = gl_FragCoord.xy / u_resolution;
-    uv.x *= u_resolution.x / u_resolution.y;
-
-    float time = u_time * 0.08;
-
-    float wave1 = sin(uv.x * 4.0 + time);
-    float wave2 = sin(uv.y * 5.0 - time * 1.3);
-    float wave3 = sin((uv.x + uv.y) * 3.0 + time * 0.7);
-
-    float blend = 0.5 + 0.5 * sin(wave1 + wave2 + wave3);
-
-    vec3 darkGreen = vec3(0.035, 0.12, 0.075);
-    vec3 green = vec3(0.08, 0.32, 0.20);
-    vec3 purple = vec3(0.20, 0.10, 0.34);
-
-    vec3 color = mix(darkGreen, green, blend);
-    color = mix(color, purple, 0.25 + 0.15 * wave3);
-
-    outputColor = vec4(color, 1.0);
-  }`;
-function ShaderBackground() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const gl = canvas.getContext("webgl2", {
-      alpha: false,
-      antialias: false,
-    });
-
-    if (!gl) return;
-
-    const vertexShader = gl.createShader(gl.VERTEX_SHADER);
-    if (!vertexShader) {
-      throw new Error("Failed to create vertex shader");
-    }
-    gl.shaderSource(vertexShader, OptionsVertexShader);
-    gl.compileShader(vertexShader);
-    if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
-      throw new Error(
-        `Failed to compile vertex shader: ${gl.getShaderInfoLog(vertexShader)}`,
-      );
-    }
-
-    const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-    if (!fragmentShader) {
-      throw new Error("Failed to create fragment shader");
-    }
-    gl.shaderSource(fragmentShader, OptionsFragmentShader);
-    gl.compileShader(fragmentShader);
-    if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
-      throw new Error(
-        `Failed to compile fragment shader: ${gl.getShaderInfoLog(fragmentShader)}`,
-      );
-    }
-
-    const shaderProgram = gl.createProgram();
-    if (!shaderProgram) {
-      gl.deleteShader(vertexShader);
-      gl.deleteShader(fragmentShader);
-      throw new Error("Failed to create shader program");
-    }
-    gl.attachShader(shaderProgram, vertexShader);
-    gl.attachShader(shaderProgram, fragmentShader);
-    gl.linkProgram(shaderProgram);
-    if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
-      const message = gl.getProgramInfoLog(shaderProgram);
-      gl.deleteShader(vertexShader);
-      gl.deleteShader(fragmentShader);
-      gl.deleteProgram(shaderProgram);
-      throw new Error(`Failed to link shader program: ${message}`);
-    }
-    gl.useProgram(shaderProgram);
-    const u_time = gl.getUniformLocation(shaderProgram, "u_time");
-    const u_resolution = gl.getUniformLocation(shaderProgram, "u_resolution");
-    if (!u_time || !u_resolution) {
-      throw new Error("Failed to get uniform locations");
-    }
-    let frameHandle = 0;
-    function render(time: DOMHighResTimeStamp) {
-      resizeCanvas();
-
-      gl.useProgram(shaderProgram);
-      gl.uniform2f(u_resolution, canvas.width, canvas.height);
-      gl.uniform1f(u_time, time * 0.001);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
-
-      frameHandle = requestAnimationFrame(render);
-    }
-    function resizeCanvas() {
-      const pixelRatio = Math.min(window.devicePixelRatio, 2);
-      const width = Math.max(1, Math.round(canvas.clientWidth * pixelRatio));
-      const height = Math.max(1, Math.round(canvas.clientHeight * pixelRatio));
-
-      if (canvas.width !== width || canvas.height !== height) {
-        canvas.width = width;
-        canvas.height = height;
-        gl.viewport(0, 0, width, height);
-      }
-    }
-    const resizeObserver = new ResizeObserver(resizeCanvas);
-    resizeObserver.observe(canvas);
-    resizeCanvas();
-    frameHandle = requestAnimationFrame(render);
-
-    // Compile shaders and start animation here.
-
-    return () => {
-      resizeObserver.disconnect();
-      cancelAnimationFrame(frameHandle);
-      gl.deleteShader(vertexShader);
-      gl.deleteShader(fragmentShader);
-      gl.deleteProgram(shaderProgram);
-      // Cancel requestAnimationFrame and delete WebGL resources here.
-    };
-  }, []);
-
-  return <canvas ref={canvasRef} className="shader" aria-hidden="true" />;
-}
 const OptionsWindow = memo(function OptionsWindow({
   themeList,
   themeSet,
