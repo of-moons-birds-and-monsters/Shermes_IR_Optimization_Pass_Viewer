@@ -9,6 +9,19 @@
   --gold: #d4af37;
   --yellow: #fbec5d;
   --red: #cf6679;
+  --background-deep-green-triadic: #256e4b;
+  --background-deep-green: #123524;
+
+  --border-radius: 0.35rem;
+}
+
+.base-element-style {
+  border: 1px solid var(--gold);
+  border-radius: var(--border-radius);
+  padding: 0.4rem 0.65rem;
+  background: var(--background-deep-green);
+  color: var(--text);
+  cursor: pointer;
 }
 
 .app {
@@ -54,6 +67,39 @@
     justify-content: flex-end;
     gap: 0.5rem;
   }
+
+  .editor-theme-selector {
+    border: 1px solid var(--gold);
+    border-radius: var(--border-radius);
+    padding: 0.4rem 0.65rem;
+    background: var(--background-deep-green);
+    color: var(--text);
+    cursor: pointer;
+
+    select {
+      background: var(--background-deep-green-triadic);
+      color: var(--text);
+      border-radius: var(--border-radius);
+    }
+  }
+}
+
+.options-window {
+  z-index: 1000;
+  position: fixed;
+  top: 25vh;
+  left: 25vw;
+  width: 50vw;
+  height: 50vh;
+}
+
+.hide-background-content {
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  position: fixed;
+  background: rgba(50, 50, 50, 0.9);
 }
 
 .app__header h1 {
@@ -73,9 +119,9 @@
 .side-selector button,
 .timeline button {
   border: 1px solid var(--gold);
-  border-radius: 0.35rem;
+  border-radius: var(--border-radius);
   padding: 0.4rem 0.65rem;
-  background: #123524;
+  background: var(--background-deep-green);
   color: var(--text);
   cursor: pointer;
 }
@@ -100,7 +146,7 @@
   margin: 1rem;
   padding: 1rem;
   border: 1px solid var(--border);
-  border-radius: 0.4rem;
+  border-radius: var(--border-radius);
   background: var(--surface-raised);
 }
 
@@ -120,7 +166,7 @@
   margin: 0;
   padding: 0.65rem;
   border: 1px solid var(--border);
-  border-radius: 0.4rem;
+  border-radius: var(--border-radius);
   background: var(--surface-raised);
 }
 
@@ -163,7 +209,7 @@
   min-width: 0;
   padding: 0.4rem;
   border: 1px solid var(--border);
-  border-radius: 0.25rem;
+  border-radius: var(--border-radius);
   background: var(--surface);
   color: var(--text);
 }
@@ -231,7 +277,7 @@
   width: 8rem;
   padding: 0.35rem 0.45rem;
   border: 1px solid var(--border);
-  border-radius: 0.25rem;
+  border-radius: var(--border-radius);
   background: var(--surface);
   color: var(--text);
 }

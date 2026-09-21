@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
   useState,
+  memo,
 } from "react";
 import "./App.css";
 import { IrDiffEditor } from "./Editor";
@@ -37,6 +38,9 @@ import {
   type Selection,
   type TimelineEntry,
 } from "./dumpNavigation";
+import { themeNamesArray, themeNames } from "./themeNames";
+
+import { highlighter, monaco } from "./monaco";
 
 interface AppSettings {
   useFileDialog: UseFileDialogOptions;
@@ -176,6 +180,83 @@ function statusMessage(entry: TimelineEntry): string {
   }
 }
 
+const Greeting = memo(function Greeting({ name }: { name: string }) {
+  return <h1>Hello, {name}!</h1>;
+});
+type ThemeSelectorProps = {
+  themeList: string[];
+  themeSet: Set<string>;
+  themeListLength: number;
+  currentTheme: string;
+  setTheme: (theme: string) => void;
+};
+type OptionsWindowProps = ThemeSelectorProps & {
+  toggleOptionsWindow: () => void;
+};
+
+const OptionsWindow = memo(function OptionsWindow({
+  themeList,
+  themeSet,
+  themeListLength,
+  setTheme,
+  currentTheme,
+  toggleOptionsWindow,
+}: OptionsWindowProps) {
+  return (
+    <div onClick={toggleOptionsWindow} className="hide-background-content">
+      <div
+        onClick={(ev) => ev.stopPropagation()}
+        className="base-element-style options-window"
+      >
+        <ThemeSelector
+          currentTheme={currentTheme}
+          setTheme={setTheme}
+          themeList={themeList}
+          themeSet={themeSet}
+          themeListLength={themeListLength}
+        />
+      </div>
+    </div>
+  );
+});
+
+const ThemeSelector = memo(function ThemeSelector({
+  themeList,
+  themeSet,
+  themeListLength,
+
+  setTheme,
+  currentTheme,
+}: ThemeSelectorProps) {
+  return (
+    <div className="editor-theme-selector">
+      <div>Editor Theme:</div>
+      <select
+        name="monacoTheme"
+        id="monacoTheme"
+        defaultValue={currentTheme}
+        onChange={(e) => {
+          if (!themeList.includes(e.target.value)) {
+            throw new Error(
+              `Invalid theme name included in the drop down list. Please file a pr any mention this: ${e.target.value}`,
+            );
+          }
+          setTheme(e.target.value);
+          //monaco.editor.setTheme(e.target.value);
+        }}
+      >
+        {themeList.map((theme) => {
+          return (
+            <option key={theme} value={theme}>
+              {theme}
+            </option>
+          );
+        })}
+      </select>
+    </div>
+  );
+});
+
 function App() {
   const [files, open] = useFileDialog(appSettings.useFileDialog);
   const [loadedDump, setLoadedDump] = useState<{
@@ -202,6 +283,11 @@ function App() {
   const [elementInputError, setElementInputError] = useState<string>();
 
   const [editorTheme, setEditorTheme] = useState<string>("vitesse-dark");
+  useEffect(() => {
+    monaco.editor.setTheme(editorTheme);
+  }, [editorTheme]);
+
+  const [optionsWindowOpen, setOptionsWindowOpen] = useState(false);
 
   useEffect(() => {
     const file = files?.[0];
@@ -303,10 +389,10 @@ function App() {
 
   const applicableSelectedElement =
     selectedElement &&
-      before?.functionId === selectedElement.target.functionId &&
-      after?.functionId === selectedElement.target.functionId &&
-      beforeTrace?.id === selectedElement.traceId &&
-      afterTrace?.id === selectedElement.traceId
+    before?.functionId === selectedElement.target.functionId &&
+    after?.functionId === selectedElement.target.functionId &&
+    beforeTrace?.id === selectedElement.traceId &&
+    afterTrace?.id === selectedElement.traceId
       ? selectedElement
       : undefined;
 
@@ -320,7 +406,7 @@ function App() {
       selectedElement &&
       (selection.functionId !== selectedElement.target.functionId ||
         cache?.snapshotIdToTrace.get(selection.snapshotId)?.id !==
-        selectedElement.traceId)
+          selectedElement.traceId)
     ) {
       clearElementSelection();
     } else if (selectedElement) {
@@ -338,7 +424,7 @@ function App() {
       selectedElement &&
       (selection.functionId !== selectedElement.target.functionId ||
         cache?.snapshotIdToTrace.get(selection.snapshotId)?.id !==
-        selectedElement.traceId)
+          selectedElement.traceId)
     ) {
       clearElementSelection();
     } else if (selectedElement) {
@@ -510,11 +596,11 @@ function App() {
     () =>
       applicableSelectedElement && elementNavigation && before
         ? elementNavigation.findElementChange(
-          applicableSelectedElement.target,
-          applicableSelectedElement.initialAnchorSnapshotId ??
-          before.snapshotId,
-          "previous",
-        )
+            applicableSelectedElement.target,
+            applicableSelectedElement.initialAnchorSnapshotId ??
+              before.snapshotId,
+            "previous",
+          )
         : undefined,
     [applicableSelectedElement, before, elementNavigation],
   );
@@ -522,11 +608,11 @@ function App() {
     () =>
       applicableSelectedElement && elementNavigation && after
         ? elementNavigation.findElementChange(
-          applicableSelectedElement.target,
-          applicableSelectedElement.initialAnchorSnapshotId ??
-          after.snapshotId,
-          "next",
-        )
+            applicableSelectedElement.target,
+            applicableSelectedElement.initialAnchorSnapshotId ??
+              after.snapshotId,
+            "next",
+          )
         : undefined,
     [after, applicableSelectedElement, elementNavigation],
   );
@@ -551,26 +637,26 @@ function App() {
   const beforeElementOccurrence =
     applicableSelectedElement && elementNavigation && before
       ? elementNavigation.findOccurrence(
-        applicableSelectedElement.target,
-        before.snapshotId,
-      )
+          applicableSelectedElement.target,
+          before.snapshotId,
+        )
       : undefined;
   const afterElementOccurrence =
     applicableSelectedElement && elementNavigation && after
       ? elementNavigation.findOccurrence(
-        applicableSelectedElement.target,
-        after.snapshotId,
-      )
+          applicableSelectedElement.target,
+          after.snapshotId,
+        )
       : undefined;
   const beforeElementOffset =
     beforeElementOccurrence && beforeEntry?.version
       ? beforeElementOccurrence.version.dumpRange.start -
-      beforeEntry.version.dumpRange.start
+        beforeEntry.version.dumpRange.start
       : undefined;
   const afterElementOffset =
     afterElementOccurrence && afterEntry?.version
       ? afterElementOccurrence.version.dumpRange.start -
-      afterEntry.version.dumpRange.start
+        afterEntry.version.dumpRange.start
       : undefined;
   // NOTE: do not memoize these objects, or else this breaks and risks stale data.
   const matchAfter = () =>
@@ -585,6 +671,8 @@ function App() {
       snapshotId: after!.snapshotId,
     });
 
+  const toggleOptionsWindow = () => setOptionsWindowOpen(!optionsWindowOpen);
+  console.log(optionsWindowOpen);
   return (
     <main className="app">
       <header className="app__header">
@@ -593,20 +681,22 @@ function App() {
           {fileName && <span className="app__file-name">{fileName}</span>}
         </div>
         <div>
-          <div>Editor Theme:</div>
-          <input
-            type="text"
-            name="editorTheme"
-            defaultValue="vitesse-dark"
-            onChange={(e) => {
-              console.log(e.target.value);
-              try {
-                setEditorTheme(e.target.value);
-              } catch (e) {
-                console.log(e);
-              }
-            }}
-          />
+          <button
+            onClick={() => toggleOptionsWindow()}
+            className="base-element-style"
+          >
+            options
+          </button>
+          {optionsWindowOpen && (
+            <OptionsWindow
+              currentTheme={editorTheme}
+              setTheme={setEditorTheme}
+              toggleOptionsWindow={toggleOptionsWindow}
+              themeList={themeNamesArray}
+              themeSet={themeNames}
+              themeListLength={themeNamesArray.length}
+            />
+          )}
         </div>
 
         <div className="button-container">
@@ -778,8 +868,8 @@ function App() {
                       : "%"}
                     {applicableSelectedElement.target.number}
                     {lastElementChange &&
-                      lastElementChange.beforeSnapshotId === before?.snapshotId &&
-                      lastElementChange.afterSnapshotId === after?.snapshotId
+                    lastElementChange.beforeSnapshotId === before?.snapshotId &&
+                    lastElementChange.afterSnapshotId === after?.snapshotId
                       ? ` · ${lastElementChange.reasons.join(", ")}`
                       : beforeElementOccurrence && !afterElementOccurrence
                         ? " · absent from After"
@@ -788,9 +878,9 @@ function App() {
                           : beforeElementOccurrence && afterElementOccurrence
                             ? ""
                             : elementNavigation?.hasElementInTrace(
-                              applicableSelectedElement.target,
-                              applicableSelectedElement.traceId,
-                            )
+                                  applicableSelectedElement.target,
+                                  applicableSelectedElement.traceId,
+                                )
                               ? " · absent from both selected snapshots"
                               : " · never observed in this function and trace"}
                   </div>
@@ -808,15 +898,18 @@ function App() {
                     return (
                       <button
                         key={entry.snapshot.id}
-                        className={`timeline__entry timeline__entry--${entry.status}${isComparisonSelection
+                        className={`timeline__entry timeline__entry--${entry.status}${
+                          isComparisonSelection
                             ? " timeline__entry--comparison-selected"
                             : ""
-                          }${entry.snapshot.id === activeSelection?.snapshotId
+                        }${
+                          entry.snapshot.id === activeSelection?.snapshotId
                             ? " timeline__entry--selected"
                             : ""
-                          }`}
-                        title={`${snapshotLabel(entry.snapshot)}: ${entry.status}${isBeforeSelection ? " · Before" : ""
-                          }${isAfterSelection ? " · After" : ""}`}
+                        }`}
+                        title={`${snapshotLabel(entry.snapshot)}: ${entry.status}${
+                          isBeforeSelection ? " · Before" : ""
+                        }${isAfterSelection ? " · After" : ""}`}
                         onClick={() => selectTimelineEntry(entry)}
                       >
                         <span className="timeline__marker" />
