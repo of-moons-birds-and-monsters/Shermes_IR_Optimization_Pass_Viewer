@@ -14,6 +14,8 @@ export interface IrDiffEditorProps {
   sideBySide?: boolean;
   originalElementOffset?: number;
   modifiedElementOffset?: number;
+  setActiveSide?: (side: React.SetStateAction<ComparisonSide>) => void;
+
   onSelectElement?: (side: ComparisonSide, reference: string) => void;
 }
 
@@ -36,6 +38,7 @@ export function IrDiffEditor({
   originalElementOffset,
   modifiedElementOffset,
   onSelectElement,
+  setActiveSide,
 }: IrDiffEditorProps) {
   const diffEditorRef = useRef<MonacoDiffEditor | null>(null);
   const originalDecorationsRef =
@@ -48,43 +51,52 @@ export function IrDiffEditor({
     onSelectElementRef.current = onSelectElement;
   }, [onSelectElement]);
 
-  const handleMount: DiffOnMount = useCallback(
-    (editor, monaco) => {
-      diffEditorRef.current = editor;
-      const originalEditor = editor.getOriginalEditor();
-      const modifiedEditor = editor.getModifiedEditor();
-      modifiedEditor.updateOptions({ readOnly: true });
-      monaco.editor.setTheme("vitesse-dark");
-      originalDecorationsRef.current = originalEditor.createDecorationsCollection();
-      modifiedDecorationsRef.current = modifiedEditor.createDecorationsCollection();
-
-      const listen = (
-        side: ComparisonSide,
-        codeEditor: MonacoEditor.ICodeEditor,
-      ) =>
-        codeEditor.onMouseDown((event) => {
-          const position = event.target.position;
-          const model = codeEditor.getModel();
-          if (!position || !model) return;
-          const reference = referenceAtColumn(
-            model.getLineContent(position.lineNumber),
-            position.column,
-          );
-          if (reference) onSelectElementRef.current?.(side, reference);
-        });
-
-      const originalListener = listen("before", originalEditor);
-      const modifiedListener = listen("after", modifiedEditor);
-      editor.onDidDispose(() => {
-        originalListener.dispose();
-        modifiedListener.dispose();
-        diffEditorRef.current = null;
-        originalDecorationsRef.current = null;
-        modifiedDecorationsRef.current = null;
+  const handleMount: DiffOnMount = useCallback((editor, monaco) => {
+    diffEditorRef.current = editor;
+    const originalEditor = editor.getOriginalEditor();
+    const modifiedEditor = editor.getModifiedEditor();
+    if (setActiveSide) {
+      originalEditor.onMouseDown((_) => {
+        setActiveSide("before");
       });
-    },
-    [],
-  );
+      modifiedEditor.onMouseDown((_) => {
+        setActiveSide("after");
+      });
+    }
+
+    modifiedEditor.updateOptions({ readOnly: true });
+    monaco.editor.setTheme("vitesse-dark");
+    originalDecorationsRef.current =
+      originalEditor.createDecorationsCollection();
+    modifiedDecorationsRef.current =
+      modifiedEditor.createDecorationsCollection();
+
+    const listen = (
+      side: ComparisonSide,
+      codeEditor: MonacoEditor.ICodeEditor,
+    ) =>
+      codeEditor.onMouseDown((event) => {
+        const position = event.target.position;
+        const model = codeEditor.getModel();
+        if (!position || !model) return;
+        const reference = referenceAtColumn(
+          model.getLineContent(position.lineNumber),
+          position.column,
+        );
+
+        if (reference) onSelectElementRef.current?.(side, reference);
+      });
+
+    const originalListener = listen("before", originalEditor);
+    const modifiedListener = listen("after", modifiedEditor);
+    editor.onDidDispose(() => {
+      originalListener.dispose();
+      modifiedListener.dispose();
+      diffEditorRef.current = null;
+      originalDecorationsRef.current = null;
+      modifiedDecorationsRef.current = null;
+    });
+  }, []);
 
   useEffect(() => {
     const diffEditor = diffEditorRef.current;
@@ -138,6 +150,7 @@ export function IrDiffEditor({
       theme="vitesse-dark"
       onMount={handleMount}
       options={{
+        scrollbar: { vertical: "auto", horizontal: "auto" },
         automaticLayout: true,
         readOnly: true,
         renderSideBySide: sideBySide,

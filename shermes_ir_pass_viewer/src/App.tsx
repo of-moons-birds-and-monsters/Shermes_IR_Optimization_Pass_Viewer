@@ -216,7 +216,11 @@ function App() {
         const elementNavigation = createElementNavigation(nextIndex);
         const selections = defaultSelections(nextIndex, nextCache);
         setError(undefined);
-        setLoadedDump({ index: nextIndex, cache: nextCache, elementNavigation });
+        setLoadedDump({
+          index: nextIndex,
+          cache: nextCache,
+          elementNavigation,
+        });
         setBefore(selections?.before);
         setAfter(selections?.after);
         setFileName(file.name);
@@ -296,10 +300,10 @@ function App() {
 
   const applicableSelectedElement =
     selectedElement &&
-    before?.functionId === selectedElement.target.functionId &&
-    after?.functionId === selectedElement.target.functionId &&
-    beforeTrace?.id === selectedElement.traceId &&
-    afterTrace?.id === selectedElement.traceId
+      before?.functionId === selectedElement.target.functionId &&
+      after?.functionId === selectedElement.target.functionId &&
+      beforeTrace?.id === selectedElement.traceId &&
+      afterTrace?.id === selectedElement.traceId
       ? selectedElement
       : undefined;
 
@@ -313,11 +317,14 @@ function App() {
       selectedElement &&
       (selection.functionId !== selectedElement.target.functionId ||
         cache?.snapshotIdToTrace.get(selection.snapshotId)?.id !==
-          selectedElement.traceId)
+        selectedElement.traceId)
     ) {
       clearElementSelection();
     } else if (selectedElement) {
-      setSelectedElement({ ...selectedElement, initialAnchorSnapshotId: undefined });
+      setSelectedElement({
+        ...selectedElement,
+        initialAnchorSnapshotId: undefined,
+      });
       setLastElementChange(undefined);
     }
     setBefore(selection);
@@ -328,11 +335,14 @@ function App() {
       selectedElement &&
       (selection.functionId !== selectedElement.target.functionId ||
         cache?.snapshotIdToTrace.get(selection.snapshotId)?.id !==
-          selectedElement.traceId)
+        selectedElement.traceId)
     ) {
       clearElementSelection();
     } else if (selectedElement) {
-      setSelectedElement({ ...selectedElement, initialAnchorSnapshotId: undefined });
+      setSelectedElement({
+        ...selectedElement,
+        initialAnchorSnapshotId: undefined,
+      });
       setLastElementChange(undefined);
     }
     setAfter(selection);
@@ -469,7 +479,10 @@ function App() {
 
   const selectElementFromInput = () => {
     if (!activeSelection || !activeTrace) return;
-    const target = parseElementReference(elementInput, activeSelection.functionId);
+    const target = parseElementReference(
+      elementInput,
+      activeSelection.functionId,
+    );
     if (!target) {
       setSelectedElement(undefined);
       setLastElementChange(undefined);
@@ -482,7 +495,9 @@ function App() {
       initialAnchorSnapshotId: activeSelection.snapshotId,
     });
     setElementInput(
-      target.kind === "basic-block" ? `%BB${target.number}` : `%${target.number}`,
+      target.kind === "basic-block"
+        ? `%BB${target.number}`
+        : `%${target.number}`,
     );
     setLastElementChange(undefined);
     setElementInputError(undefined);
@@ -492,10 +507,11 @@ function App() {
     () =>
       applicableSelectedElement && elementNavigation && before
         ? elementNavigation.findElementChange(
-            applicableSelectedElement.target,
-            applicableSelectedElement.initialAnchorSnapshotId ?? before.snapshotId,
-            "previous",
-          )
+          applicableSelectedElement.target,
+          applicableSelectedElement.initialAnchorSnapshotId ??
+          before.snapshotId,
+          "previous",
+        )
         : undefined,
     [applicableSelectedElement, before, elementNavigation],
   );
@@ -503,10 +519,11 @@ function App() {
     () =>
       applicableSelectedElement && elementNavigation && after
         ? elementNavigation.findElementChange(
-            applicableSelectedElement.target,
-            applicableSelectedElement.initialAnchorSnapshotId ?? after.snapshotId,
-            "next",
-          )
+          applicableSelectedElement.target,
+          applicableSelectedElement.initialAnchorSnapshotId ??
+          after.snapshotId,
+          "next",
+        )
         : undefined,
     [after, applicableSelectedElement, elementNavigation],
   );
@@ -530,21 +547,27 @@ function App() {
 
   const beforeElementOccurrence =
     applicableSelectedElement && elementNavigation && before
-      ? elementNavigation.findOccurrence(applicableSelectedElement.target, before.snapshotId)
+      ? elementNavigation.findOccurrence(
+        applicableSelectedElement.target,
+        before.snapshotId,
+      )
       : undefined;
   const afterElementOccurrence =
     applicableSelectedElement && elementNavigation && after
-      ? elementNavigation.findOccurrence(applicableSelectedElement.target, after.snapshotId)
+      ? elementNavigation.findOccurrence(
+        applicableSelectedElement.target,
+        after.snapshotId,
+      )
       : undefined;
   const beforeElementOffset =
     beforeElementOccurrence && beforeEntry?.version
       ? beforeElementOccurrence.version.dumpRange.start -
-        beforeEntry.version.dumpRange.start
+      beforeEntry.version.dumpRange.start
       : undefined;
   const afterElementOffset =
     afterElementOccurrence && afterEntry?.version
       ? afterElementOccurrence.version.dumpRange.start -
-        afterEntry.version.dumpRange.start
+      afterEntry.version.dumpRange.start
       : undefined;
   // NOTE: do not memoize these objects, or else this breaks and risks stale data.
   const matchAfter = () =>
@@ -558,6 +581,7 @@ function App() {
       functionId: before!.functionId,
       snapshotId: after!.snapshotId,
     });
+
   return (
     <main className="app">
       <header className="app__header">
@@ -568,29 +592,20 @@ function App() {
         <button className="app__button" onClick={() => open()}>
           Open dump file
         </button>
+        <button
+          className="app__button"
+          type="button"
+          aria-expanded={!sideSelectorsCollapsed}
+          onClick={() => setSideSelectorsCollapsed((value) => !value)}
+        >
+          {sideSelectorsCollapsed ? "Expand" : "Collapse"}
+        </button>
       </header>
 
       {error && <div className="app__error">Could not open dump: {error}</div>}
 
       {index && cache && before && after ? (
         <>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "flex-end",
-              width: "100%",
-            }}
-          >
-            <button
-              className="app__button"
-              type="button"
-              aria-expanded={!sideSelectorsCollapsed}
-              onClick={() => setSideSelectorsCollapsed((value) => !value)}
-            >
-              {sideSelectorsCollapsed ? "Expand" : "Collapse"}
-            </button>
-          </div>
-
           <section className="selectors" aria-label="Comparison selections">
             {!sideSelectorsCollapsed && (
               <>
@@ -645,7 +660,9 @@ function App() {
                         }}
                       />
                     </label>
-                    <button onClick={selectElementFromInput}>Select element</button>
+                    <button onClick={selectElementFromInput}>
+                      Select element
+                    </button>
                     <button
                       disabled={!previousElementChange}
                       onClick={() => applyElementChange(previousElementChange)}
@@ -658,12 +675,7 @@ function App() {
                     >
                       Next element change
                     </button>
-                    <button onClick={() => stepTimeline(-1)}>
-                      Previous snapshot
-                    </button>
-                    <button onClick={() => stepTimeline(1)}>
-                      Next snapshot
-                    </button>
+
                     {selectionsShareTrace && (
                       <>
                         <button
@@ -686,15 +698,44 @@ function App() {
                         </button>
                       </>
                     )}
+                    <button onClick={() => stepTimeline(-1)}>
+                      Previous snapshot
+                    </button>
+                    <button onClick={() => stepTimeline(1)}>
+                      Next snapshot
+                    </button>
                   </div>
                 )}
-                <button
-                  type="button"
-                  aria-expanded={!timelineCollapsed}
-                  onClick={() => setTimelineCollapsed((value) => !value)}
+
+                <div
+                  style={{
+                    textAlign: "center",
+                  }}
                 >
-                  {timelineCollapsed ? "Expand" : "Collapse"}
-                </button>
+                  <button
+                    type="button"
+                    aria-expanded={!timelineCollapsed}
+                    onClick={() => setTimelineCollapsed((value) => !value)}
+                    style={{
+                      display: "inline-flex",
+                      width: "2em",
+                      height: "2em",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <span
+                      style={{
+                        transition: "transform 0.1s",
+                        transform: timelineCollapsed
+                          ? "rotate(-90deg)"
+                          : "none",
+                      }}
+                    >
+                      {"<"}
+                    </span>
+                  </button>
+                </div>
               </div>
             </div>
             {!timelineCollapsed && (
@@ -706,25 +747,30 @@ function App() {
                 )}
                 {applicableSelectedElement && (
                   <div className="element-navigation__status">
-                    Selected {applicableSelectedElement.target.kind === "basic-block" ? "block" : "instruction"}{" "}
-                    {applicableSelectedElement.target.kind === "basic-block" ? "%BB" : "%"}
+                    Selected{" "}
+                    {applicableSelectedElement.target.kind === "basic-block"
+                      ? "block"
+                      : "instruction"}{" "}
+                    {applicableSelectedElement.target.kind === "basic-block"
+                      ? "%BB"
+                      : "%"}
                     {applicableSelectedElement.target.number}
                     {lastElementChange &&
-                    lastElementChange.beforeSnapshotId === before?.snapshotId &&
-                    lastElementChange.afterSnapshotId === after?.snapshotId
+                      lastElementChange.beforeSnapshotId === before?.snapshotId &&
+                      lastElementChange.afterSnapshotId === after?.snapshotId
                       ? ` · ${lastElementChange.reasons.join(", ")}`
-                        : beforeElementOccurrence && !afterElementOccurrence
-                          ? " · absent from After"
-                          : !beforeElementOccurrence && afterElementOccurrence
-                            ? " · absent from Before"
-                            : beforeElementOccurrence && afterElementOccurrence
-                              ? ""
-                          : elementNavigation?.hasElementInTrace(
-                                applicableSelectedElement.target,
-                                applicableSelectedElement.traceId,
-                              )
-                            ? " · absent from both selected snapshots"
-                            : " · never observed in this function and trace"}
+                      : beforeElementOccurrence && !afterElementOccurrence
+                        ? " · absent from After"
+                        : !beforeElementOccurrence && afterElementOccurrence
+                          ? " · absent from Before"
+                          : beforeElementOccurrence && afterElementOccurrence
+                            ? ""
+                            : elementNavigation?.hasElementInTrace(
+                              applicableSelectedElement.target,
+                              applicableSelectedElement.traceId,
+                            )
+                              ? " · absent from both selected snapshots"
+                              : " · never observed in this function and trace"}
                   </div>
                 )}
                 <div className="timeline__track" ref={timelineTrackRef}>
@@ -740,18 +786,15 @@ function App() {
                     return (
                       <button
                         key={entry.snapshot.id}
-                        className={`timeline__entry timeline__entry--${entry.status}${
-                          isComparisonSelection
+                        className={`timeline__entry timeline__entry--${entry.status}${isComparisonSelection
                             ? " timeline__entry--comparison-selected"
                             : ""
-                        }${
-                          entry.snapshot.id === activeSelection?.snapshotId
+                          }${entry.snapshot.id === activeSelection?.snapshotId
                             ? " timeline__entry--selected"
                             : ""
-                        }`}
-                        title={`${snapshotLabel(entry.snapshot)}: ${entry.status}${
-                          isBeforeSelection ? " · Before" : ""
-                        }${isAfterSelection ? " · After" : ""}`}
+                          }`}
+                        title={`${snapshotLabel(entry.snapshot)}: ${entry.status}${isBeforeSelection ? " · Before" : ""
+                          }${isAfterSelection ? " · After" : ""}`}
                         onClick={() => selectTimelineEntry(entry)}
                       >
                         <span className="timeline__marker" />
@@ -771,6 +814,7 @@ function App() {
               originalElementOffset={beforeElementOffset}
               modifiedElementOffset={afterElementOffset}
               onSelectElement={selectElementReference}
+              setActiveSide={setActiveSide}
             />
           </section>
         </>
