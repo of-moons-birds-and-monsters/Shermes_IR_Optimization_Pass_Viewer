@@ -86,12 +86,14 @@ void main() {
   mat3 inverseRotation = transpose(objectRotation);
 
   float aspect = u_resolution.x / u_resolution.y;
-  vec3 halfSize = vec3(aspect * 0.96, 0.96, 0.16);
+  // Overscan the slab so its small rotation never exposes the background at
+  // the edges of the canvas.
+  vec3 halfSize = vec3(aspect * 1.08, 1.08, 0.16);
   vec3 localOrigin = inverseRotation * rayOrigin;
   vec3 localDirection = inverseRotation * rayDirection;
   vec2 intersection = intersectBox(localOrigin, localDirection, halfSize);
 
-  vec3 background = vec3(0.008, 0.022, 0.014);
+  vec3 background = vec3(0.012, 0.075, 0.040);
   if (intersection.x > intersection.y || intersection.y < 0.0) {
     outputColor = vec4(background, 1.0);
     return;
