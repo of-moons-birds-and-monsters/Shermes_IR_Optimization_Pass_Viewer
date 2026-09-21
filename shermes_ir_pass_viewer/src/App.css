@@ -27,6 +27,19 @@
   flex: 0 0 auto;
 }
 
+.accordion-button {
+  display: inline-flex;
+  width: 2em;
+  height: 2em;
+  align-items: center;
+  justify-content: center;
+
+  span {
+    display: inline-block;
+    transition: transform 150ms ease;
+  }
+}
+
 .app__header {
   display: flex;
   justify-content: space-between;
@@ -35,6 +48,12 @@
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--border);
   min-height: 0;
+
+  .button-container {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
 }
 
 .app__header h1 {
@@ -303,6 +322,11 @@
   white-space: nowrap;
 }
 
+.monaco-editor.focused {
+  border-width: 2px;
+  border-color: blueviolet;
+}
+
 .app__editor {
   padding-top: 0.35rem;
   /*flex: 1 1 70%;*/
@@ -310,7 +334,18 @@
   min-height: 0;
   /*height: 60%;*/
   overflow: hidden;
-  /*min-height: 800px;*/
+
+  /*use the pseudo here otherwise it will not really work. Even if you use !important over your selector it will not work without the pseudo*/
+  .active-side::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 100;
+    box-sizing: border-box;
+    border: 2px solid var(--gold);
+    pointer-events: none;
+    /*box-shadow: inset 10px 10px 10px 1px var(--gold)*/
+  }
 }
 
 .selected-ir-element {

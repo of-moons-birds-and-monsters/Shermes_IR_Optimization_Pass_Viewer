@@ -589,17 +589,25 @@ function App() {
           <h1>Shermes IR pass viewer</h1>
           {fileName && <span className="app__file-name">{fileName}</span>}
         </div>
-        <button className="app__button" onClick={() => open()}>
-          Open dump file
-        </button>
-        <button
-          className="app__button"
-          type="button"
-          aria-expanded={!sideSelectorsCollapsed}
-          onClick={() => setSideSelectorsCollapsed((value) => !value)}
-        >
-          {sideSelectorsCollapsed ? "Expand" : "Collapse"}
-        </button>
+        <div className="button-container">
+          <button className="app__button" onClick={() => open()}>
+            Open dump file
+          </button>
+          <button
+            className="app__button accordion-button"
+            type="button"
+            aria-expanded={!sideSelectorsCollapsed}
+            onClick={() => setSideSelectorsCollapsed((value) => !value)}
+          >
+            <span
+              style={{
+                transform: sideSelectorsCollapsed ? "rotate(-90deg)" : "none",
+              }}
+            >
+              {"<"}
+            </span>
+          </button>
+        </div>
       </header>
 
       {error && <div className="app__error">Could not open dump: {error}</div>}
@@ -716,13 +724,7 @@ function App() {
                     type="button"
                     aria-expanded={!timelineCollapsed}
                     onClick={() => setTimelineCollapsed((value) => !value)}
-                    style={{
-                      display: "inline-flex",
-                      width: "2em",
-                      height: "2em",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
+                    className="accordion-button"
                   >
                     <span
                       style={{
@@ -811,6 +813,7 @@ function App() {
             <IrDiffEditor
               original={functionText(index, beforeEntry)}
               modified={functionText(index, afterEntry)}
+              activeSide={activeSide}
               originalElementOffset={beforeElementOffset}
               modifiedElementOffset={afterElementOffset}
               onSelectElement={selectElementReference}

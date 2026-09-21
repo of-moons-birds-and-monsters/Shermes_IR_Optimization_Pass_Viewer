@@ -11,6 +11,7 @@ import { monaco } from "./monaco";
 export interface IrDiffEditorProps {
   original: string;
   modified: string;
+  activeSide: ComparisonSide;
   sideBySide?: boolean;
   originalElementOffset?: number;
   modifiedElementOffset?: number;
@@ -34,6 +35,7 @@ function referenceAtColumn(line: string, column: number): string | undefined {
 export function IrDiffEditor({
   original,
   modified,
+  activeSide,
   sideBySide = true,
   originalElementOffset,
   modifiedElementOffset,
@@ -47,6 +49,30 @@ export function IrDiffEditor({
     useRef<MonacoEditor.IEditorDecorationsCollection | null>(null);
   const onSelectElementRef = useRef(onSelectElement);
 
+  useEffect(() => {
+    const diffEditor = diffEditorRef.current;
+    if (!diffEditor) return;
+    const originalEditorDomNode = diffEditor
+      .getOriginalEditor()
+      .getContainerDomNode();
+    const modifiedEditorDomNode = diffEditor
+      .getModifiedEditor()
+      .getContainerDomNode();
+    if (originalEditorDomNode && modifiedEditorDomNode) {
+      originalEditorDomNode.classList.toggle(
+        "active-side",
+        activeSide === "before",
+      );
+      modifiedEditorDomNode.classList.toggle(
+        "active-side",
+        activeSide === "after",
+      );
+    }
+    return () => {
+      originalEditorDomNode?.classList.remove("active-side");
+      modifiedEditorDomNode?.classList.remove("active-side");
+    };
+  }, [activeSide]);
   useEffect(() => {
     onSelectElementRef.current = onSelectElement;
   }, [onSelectElement]);
@@ -62,6 +88,10 @@ export function IrDiffEditor({
       modifiedEditor.onMouseDown((_) => {
         setActiveSide("after");
       });
+    }
+    const originalDomNode = originalEditor.getDomNode();
+    const modifiedDomNode = modifiedEditor.getDomNode();
+    if (originalDomNode && modifiedDomNode) {
     }
 
     modifiedEditor.updateOptions({ readOnly: true });
