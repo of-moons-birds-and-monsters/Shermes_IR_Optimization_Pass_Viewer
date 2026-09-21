@@ -36,9 +36,9 @@ You must capture stderr to get the dump outputs. The pass content is written bas
 **dump**: the output of `-Xdump-between-passes`
 **index**: the index of the dump
 
-**snapshots**: the output IR of a specific optimizaiton pass being run on a function or multiple functions. A module scoped snapshot could contain the entire module.
+**snapshots**: the output IR of a specific optimization pass being run on a function or multiple functions. A module scoped snapshot could contain the entire module.
 In the diff viewer mode you can only ever view a single function from a snapshot at a time.
-Snapshots are deliminted by either the `*** INITIAL STATE` heading or `*** AFTER <pass-name>` heading.
+Snapshots are delimited by either the `*** INITIAL STATE` heading or `*** AFTER <pass-name>` heading.
 
 **trace**: (From DUMP_INDEX_FORMAT.md)
 
@@ -105,7 +105,7 @@ features to work (trace matching button will be added shortly)
 Within the snapshot dropdown you will see various snapshots labeled with states
 
 - **unavailable**: the function was not emitted in this trace/snapshot, but removal cannot be inferred.
-- **unknown**: the dump contains an ambiguous or inconsistent lifecycle gap.
+- **unknown**: the dump contains an ambiguous or inconsistent life cycle gap.
 - **introduced**: absent from the preceding snapshot and present in the current
   snapshot;
 - **unchanged**: present in both snapshots with equal `contentSha256` values;
@@ -121,7 +121,7 @@ In order for the Next Element Change, Previous Element Change, Advance to Next D
 be on the same function AND the same trace in both diff windows.
 
 this kind of differnce nativation is currently restricted to the same function and same trace.
-`Advance to next difference` and `Go to previous difference` will move forward and backwards to the next time there is a difference in the function defintions.
+`Advance to next difference` and `Go to previous difference` will move forward and backwards to the next time there is a difference in the function definitions.
 The entire function, and all its text, is hashed and the hashes are compared to determine if there is a difference.
 
 `Next element change` and `Previous element change` act on numbered instructions and basic blocks
@@ -136,7 +136,7 @@ Example: clicking on `%1` on this line will select `%1` , it will not select `%7
 ```
 
 Only **numbered** instructions are **selectable**
-Exmaple: you cannot select this line for tracking `StoreStackInst undefined: undefined, %1: any`
+Example: you cannot select this line for tracking `StoreStackInst undefined: undefined, %1: any`
 
 ```ll
 %BB0:
@@ -156,7 +156,7 @@ However un-numbered instructions are still used when determining changes for bas
 
 Additionally you can enter a instruction label or basic block label in the `IR element` text input box and it will select the instruction or basic block
 Labels are case sensitive and must include the `%` sign
-Exmaple: If you wanted to select the `%BB0` label you would enter `%BB0` into the text input box. If you wanted instruction "%3" you would enter "%3"
+Example: If you wanted to select the `%BB0` label you would enter `%BB0` into the text input box. If you wanted instruction "%3" you would enter "%3"
 
 ```ll
 %BB0:
@@ -177,12 +177,12 @@ Exmaple: If you wanted to select the `%BB0` label you would enter `%BB0` into th
 These are also spelled out in the navigation specification **ELEMENT_NAVIGATION.md**
 
 **Instruction changes**
-For instructions changes are not perfect. The changes are not aware of IR semantics. Addtionally to prevent a lot of false positives positional changes are relative
+For instructions changes are not perfect. The changes are not aware of IR semantics. Additionally to prevent a lot of false positives positional changes are relative
 Instruction changes are when
 
 - the content of the instruction has been changed (content is hashed and this are compared)
 - the instruction is moved between basic blocks
-- when the basic block in unchanged by the relative order of the insturctions does change
+- when the basic block in unchanged by the relative order of the instructions does change
 
 ```ll
 %BB0:
