@@ -12,14 +12,14 @@ import {
   useFileDialog,
   type UseFileDialogOptions,
 } from "./hooks/useFileDialog";
-import { buildDumpIndex, type DumpIndex } from "../../src/dump_parser";
+import { buildDumpIndex, type DumpIndex } from "../../parser_src/dump_parser";
 import {
   createElementNavigation,
   parseElementReference,
   type ElementChange,
   type ElementNavigation,
   type IrElementRef,
-} from "../../src/element_navigation";
+} from "../../parser_src/element_navigation";
 import {
   advanceSelectionsToNextDifference,
   advanceSelectionsTogether,
@@ -192,6 +192,7 @@ function App() {
   const [sideSelectorsCollapsed, setSideSelectorsCollapsed] = useState(false);
   const timelineTrackRef = useRef<HTMLDivElement>(null);
   const [elementInput, setElementInput] = useState("");
+
   const [selectedElement, setSelectedElement] = useState<{
     target: IrElementRef;
     traceId: string;
@@ -199,6 +200,8 @@ function App() {
   }>();
   const [lastElementChange, setLastElementChange] = useState<ElementChange>();
   const [elementInputError, setElementInputError] = useState<string>();
+
+  const [editorTheme, setEditorTheme] = useState<string>("vitesse-dark");
 
   useEffect(() => {
     const file = files?.[0];
@@ -589,6 +592,23 @@ function App() {
           <h1>Shermes IR pass viewer</h1>
           {fileName && <span className="app__file-name">{fileName}</span>}
         </div>
+        <div>
+          <div>Editor Theme:</div>
+          <input
+            type="text"
+            name="editorTheme"
+            defaultValue="vitesse-dark"
+            onChange={(e) => {
+              console.log(e.target.value);
+              try {
+                setEditorTheme(e.target.value);
+              } catch (e) {
+                console.log(e);
+              }
+            }}
+          />
+        </div>
+
         <div className="button-container">
           <button className="app__button" onClick={() => open()}>
             Open dump file
@@ -811,6 +831,7 @@ function App() {
 
           <section className="app__editor" aria-label="IR comparison">
             <IrDiffEditor
+              editorTheme={editorTheme}
               original={functionText(index, beforeEntry)}
               modified={functionText(index, afterEntry)}
               activeSide={activeSide}

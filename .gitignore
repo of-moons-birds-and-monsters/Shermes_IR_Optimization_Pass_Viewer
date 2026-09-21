@@ -1,3 +1,4 @@
 node_modules/
-refining_parser_grammar/dumps/
+dev_tools/refining_parser_grammar/dumps/
 shermes_ir_pass_viewer/node_modules/
+dumps/

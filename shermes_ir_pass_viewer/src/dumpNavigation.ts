@@ -3,7 +3,7 @@ import type {
   FunctionVersion,
   Snapshot,
   TraceSegment,
-} from "../../src/dump_parser";
+} from "../../parser_src/dump_parser";
 
 export type ComparisonSide = "before" | "after";
 export type Selection = { functionId: string; snapshotId: string };
@@ -152,8 +152,8 @@ export function timelineFor(
     const previousSnapshot = trace.snapshots[snapshotIndex - 1];
     const previousVersion = previousSnapshot
       ? cache.functionVersionsBySnapshotId
-          .get(previousSnapshot.id)
-          ?.get(functionId)
+        .get(previousSnapshot.id)
+        ?.get(functionId)
       : undefined;
 
     let status: LifecycleStatus;

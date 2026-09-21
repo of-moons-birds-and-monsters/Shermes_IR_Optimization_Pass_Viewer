@@ -7,7 +7,7 @@ import {
   buildDumpIndex,
   type DumpIndex,
   type TextRange,
-} from "../src/dump_parser.ts";
+} from "../../parser_src/dump_parser.ts";
 
 type FileResult = {
   file: string;
@@ -162,16 +162,23 @@ function validateIndex(index: DumpIndex): void {
     ) {
       throw new Error(`Inconsistent parent references for ${block.id}`);
     }
-    assertContainedRange(index.dump.text, block.dumpRange, parent.dumpRange, block.id);
+    assertContainedRange(
+      index.dump.text,
+      block.dumpRange,
+      parent.dumpRange,
+      block.id,
+    );
     const key = `${block.functionVersionId}\0${block.number}`;
-    if (blockKeys.has(key)) throw new Error(`Duplicate block number for ${block.id}`);
+    if (blockKeys.has(key))
+      throw new Error(`Duplicate block number for ${block.id}`);
     blockKeys.add(key);
   }
 
   const instructionKeys = new Set<string>();
   for (const instruction of index.instructionVersions) {
     const parent = functionVersions.get(instruction.functionVersionId);
-    if (!parent) throw new Error(`Unknown function version for ${instruction.id}`);
+    if (!parent)
+      throw new Error(`Unknown function version for ${instruction.id}`);
     if (
       parent.functionId !== instruction.functionId ||
       parent.snapshotId !== instruction.snapshotId
@@ -184,7 +191,11 @@ function validateIndex(index: DumpIndex): void {
       parent.dumpRange,
       instruction.id,
     );
-    if (!blockKeys.has(`${instruction.functionVersionId}\0${instruction.basicBlockNumber}`)) {
+    if (
+      !blockKeys.has(
+        `${instruction.functionVersionId}\0${instruction.basicBlockNumber}`,
+      )
+    ) {
       throw new Error(`Unknown basic block for ${instruction.id}`);
     }
     const key = `${instruction.functionVersionId}\0${instruction.number}`;

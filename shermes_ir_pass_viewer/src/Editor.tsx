@@ -9,6 +9,7 @@ import type { ComparisonSide } from "./dumpNavigation";
 import { monaco } from "./monaco";
 
 export interface IrDiffEditorProps {
+  editorTheme: string;
   original: string;
   modified: string;
   activeSide: ComparisonSide;
@@ -33,6 +34,7 @@ function referenceAtColumn(line: string, column: number): string | undefined {
 }
 
 export function IrDiffEditor({
+  editorTheme,
   original,
   modified,
   activeSide,
@@ -177,7 +179,8 @@ export function IrDiffEditor({
       original={original}
       modified={modified}
       language="llvm"
-      theme="vitesse-dark"
+      theme={editorTheme}
+      //theme="vitesse-dark"
       onMount={handleMount}
       options={{
         scrollbar: { vertical: "auto", horizontal: "auto" },
