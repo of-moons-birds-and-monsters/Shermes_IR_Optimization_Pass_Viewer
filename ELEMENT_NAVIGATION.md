@@ -116,18 +116,29 @@ otherwise stationary instruction do not reorder that instruction. Relative
 order changes when the target's ordering relationship with at least one other
 numbered instruction present in both snapshots is reversed.
 
-| Before | After | Reasons |
-| --- | --- | --- |
-| absent | present | `added` |
-| present | absent | `removed` |
-| `%1 = AddInst %2, %3` | `%1 = SubInst %2, %3` | `content-changed` |
-| `%1` in `%BB0` | `%1` in `%BB2` | `moved-between-blocks` |
-| `%1, %2` | `%2, %1` | `reordered-within-block` for both |
-| `%1, %2` | `%9, %1, %2` | `%9` added; `%1` and `%2` unchanged |
+| Before                | After                 | Reasons                             |
+| --------------------- | --------------------- | ----------------------------------- |
+| absent                | present               | `added`                             |
+| present               | absent                | `removed`                           |
+| `%1 = AddInst %2, %3` | `%1 = SubInst %2, %3` | `content-changed`                   |
+| `%1` in `%BB0`        | `%1` in `%BB2`        | `moved-between-blocks`              |
+| `%1, %2`              | `%2, %1`              | `reordered-within-block` for both   |
+| `%1, %2`              | `%9, %1, %2`          | `%9` added; `%1` and `%2` unchanged |
 
 If an instruction moves between blocks and also changes text, both reasons
 MUST be reported. Reordering within the destination block is not additionally
 reported for an instruction that moved between blocks.
+
+NOTE: There is no semantic awareness, these are just relative text changes. This means you will miss things like previous instruction additions that modify the target instrcution
+but do not move it. If we had instruction`%1`and added `PrStoreInst` before it, the system will not report that %1 has a difference,
+So if newly inserted `PrStoreInst` writes to `%2` which is used by `%1` (The second argument to PrStoreInst is the target)
+
+```ll
+PrStoreInst %4: number, %2: object, 0: number, "i": string, true: boolean
+%1 = (Does something with %2) %2, %3
+```
+
+This will not report a difference between the two instructions.
 
 ## 7. Basic-block changes
 
@@ -144,13 +155,13 @@ For a block present in both snapshots:
 Block order is relative, not absolute. Adding or removing another block before
 the target does not reorder the target.
 
-| Before | After | Reasons |
-| --- | --- | --- |
-| absent | present | `added` |
-| present | absent | `removed` |
-| same block with changed unnumbered `ReturnInst` | changed block | `content-changed` |
-| `%BB0, %BB1` | `%BB1, %BB0` | `block-reordered` for both |
-| `%BB0, %BB1` | `%BB9, %BB0, %BB1` | `%BB9` added; existing blocks not reordered |
+| Before                                          | After              | Reasons                                     |
+| ----------------------------------------------- | ------------------ | ------------------------------------------- |
+| absent                                          | present            | `added`                                     |
+| present                                         | absent             | `removed`                                   |
+| same block with changed unnumbered `ReturnInst` | changed block      | `content-changed`                           |
+| `%BB0, %BB1`                                    | `%BB1, %BB0`       | `block-reordered` for both                  |
+| `%BB0, %BB1`                                    | `%BB9, %BB0, %BB1` | `%BB9` added; existing blocks not reordered |
 
 Content and reorder reasons MAY coexist.
 
