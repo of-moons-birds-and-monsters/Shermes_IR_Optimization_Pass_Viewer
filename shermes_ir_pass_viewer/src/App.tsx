@@ -58,12 +58,13 @@ type SideSelectorProps = {
   index: DumpIndex;
   selection: Selection;
   active: boolean;
-  cache: DumpNavigationCache;
+  cache: DumpNavigationCache; // This is navigation cache to make it easier to access data in the dump indexb
   timelinesByTraceId: Map<string, TimelineEntry[]>;
+  hideRemovedSnapshots: boolean; // Hides almost all snapshot entires in the snapshot menu if they are marked removed. The first snapshot entry marked removed is saved because it must be displayed in the diff editor since removal is considered a change
   onActivate: () => void;
   onChange: (selection: Selection) => void;
-  matchOtherSideFunc: () => void;
-  matchOtherSideTrace: () => void;
+  matchOtherSideFunc: () => void; // this callback will cause this side to match the other side's function
+  matchOtherSideTrace: () => void; // this callback will cause this side to match the other side's trace
 };
 function generateTimeStatusSymbol(entry: TimelineEntry): string {
   switch (entry.status) {
@@ -93,6 +94,7 @@ function SideSelector({
   active,
   cache,
   timelinesByTraceId,
+  hideRemovedSnapshots,
   onActivate,
   onChange,
   matchOtherSideFunc: matchOtherSide,
@@ -111,6 +113,7 @@ function SideSelector({
       onChange({ functionId, snapshotId });
     }
   };
+  let foundFirstRemoved = false;
 
   return (
     <section
@@ -153,17 +156,25 @@ function SideSelector({
           >
             {index.traceSegments.map((trace) => (
               <optgroup key={trace.id} label={traceLabel(trace)}>
-                {(timelinesByTraceId.get(trace.id) ?? []).map((entry) => (
-                  <option
-                    className="snapshot-dropdown-option"
-                    key={entry.snapshot.id}
-                    value={entry.snapshot.id}
-                  >
-                    {entry.snapshot.ordinal + 1}.{" "}
-                    {snapshotLabel(entry.snapshot)} ·{" "}
-                    {timelineEntryLabel(entry)}
-                  </option>
-                ))}
+                {(timelinesByTraceId.get(trace.id) ?? []).map((entry) => {
+                  if (hideRemovedSnapshots && entry.status === "removed") {
+                    if (foundFirstRemoved) {
+                      return null;
+                    }
+                    foundFirstRemoved = true;
+                  }
+                  return (
+                    <option
+                      className="snapshot-dropdown-option"
+                      key={entry.snapshot.id}
+                      value={entry.snapshot.id}
+                    >
+                      {entry.snapshot.ordinal + 1}.{" "}
+                      {snapshotLabel(entry.snapshot)} ·{" "}
+                      {timelineEntryLabel(entry)}
+                    </option>
+                  );
+                })}
               </optgroup>
             ))}
           </select>
@@ -194,6 +205,9 @@ function createFunctionTimelines(
 }
 
 function statusMessage(entry: TimelineEntry): string {
+  if (entry.unreachable === true) {
+    return "Function is marked unreachable";
+  }
   switch (entry.status) {
     case "unchanged":
       return "No change in this pass";
@@ -205,8 +219,6 @@ function statusMessage(entry: TimelineEntry): string {
       return "Function unavailable in this trace";
     case "unknown":
       return "Invalid lifecycle gap; see parser warnings";
-    case "unreachable":
-      return "Function is marked unreachable";
     case "changed":
       return "Function changed in this pass";
     case "present":
@@ -226,6 +238,8 @@ type ThemeSelectorProps = {
 };
 type OptionsWindowProps = ThemeSelectorProps & {
   toggleOptionsWindow: () => void;
+  hideRemovedSnapshots: boolean;
+  toggleHideRemovedSnapshots: () => void;
 };
 
 const OptionsWindow = memo(function OptionsWindow({
@@ -235,6 +249,8 @@ const OptionsWindow = memo(function OptionsWindow({
   setTheme,
   currentTheme,
   toggleOptionsWindow,
+  hideRemovedSnapshots,
+  toggleHideRemovedSnapshots,
 }: OptionsWindowProps) {
   return createPortal(
     <div onClick={toggleOptionsWindow} className="hide-background-content">
@@ -246,6 +262,12 @@ const OptionsWindow = memo(function OptionsWindow({
         aria-label="Options"
       >
         <ShaderBackground />
+        <button
+          className="content options-button"
+          onClick={toggleHideRemovedSnapshots}
+        >
+          {hideRemovedSnapshots ? "Display" : "Hide"} Removed Snapshots
+        </button>
         <ThemeSelector
           currentTheme={currentTheme}
           setTheme={setTheme}
@@ -254,7 +276,7 @@ const OptionsWindow = memo(function OptionsWindow({
           themeListLength={themeListLength}
         />
         <button
-          className="close-button options-close-button"
+          className="options-button close-button options-close-button"
           aria-label="close options menu"
           onClick={toggleOptionsWindow}
         >
@@ -319,6 +341,7 @@ function App() {
   const [sideSelectorsCollapsed, setSideSelectorsCollapsed] = useState(false);
   const timelineTrackRef = useRef<HTMLDivElement>(null);
   const [elementInput, setElementInput] = useState("");
+  const [hideRemovedSnapshots, setHideRemovedSnapshots] = useState(false);
 
   const [selectedElement, setSelectedElement] = useState<{
     target: IrElementRef;
@@ -435,10 +458,10 @@ function App() {
 
   const applicableSelectedElement =
     selectedElement &&
-      before?.functionId === selectedElement.target.functionId &&
-      after?.functionId === selectedElement.target.functionId &&
-      beforeTrace?.id === selectedElement.traceId &&
-      afterTrace?.id === selectedElement.traceId
+    before?.functionId === selectedElement.target.functionId &&
+    after?.functionId === selectedElement.target.functionId &&
+    beforeTrace?.id === selectedElement.traceId &&
+    afterTrace?.id === selectedElement.traceId
       ? selectedElement
       : undefined;
 
@@ -452,7 +475,7 @@ function App() {
       selectedElement &&
       (selection.functionId !== selectedElement.target.functionId ||
         cache?.snapshotIdToTrace.get(selection.snapshotId)?.id !==
-        selectedElement.traceId)
+          selectedElement.traceId)
     ) {
       clearElementSelection();
     } else if (selectedElement) {
@@ -470,7 +493,7 @@ function App() {
       selectedElement &&
       (selection.functionId !== selectedElement.target.functionId ||
         cache?.snapshotIdToTrace.get(selection.snapshotId)?.id !==
-        selectedElement.traceId)
+          selectedElement.traceId)
     ) {
       clearElementSelection();
     } else if (selectedElement) {
@@ -651,11 +674,11 @@ function App() {
     () =>
       applicableSelectedElement && elementNavigation && before
         ? elementNavigation.findElementChange(
-          applicableSelectedElement.target,
-          applicableSelectedElement.initialAnchorSnapshotId ??
-          before.snapshotId,
-          "previous",
-        )
+            applicableSelectedElement.target,
+            applicableSelectedElement.initialAnchorSnapshotId ??
+              before.snapshotId,
+            "previous",
+          )
         : undefined,
     [applicableSelectedElement, before, elementNavigation],
   );
@@ -663,11 +686,11 @@ function App() {
     () =>
       applicableSelectedElement && elementNavigation && after
         ? elementNavigation.findElementChange(
-          applicableSelectedElement.target,
-          applicableSelectedElement.initialAnchorSnapshotId ??
-          after.snapshotId,
-          "next",
-        )
+            applicableSelectedElement.target,
+            applicableSelectedElement.initialAnchorSnapshotId ??
+              after.snapshotId,
+            "next",
+          )
         : undefined,
     [after, applicableSelectedElement, elementNavigation],
   );
@@ -692,26 +715,26 @@ function App() {
   const beforeElementOccurrence =
     applicableSelectedElement && elementNavigation && before
       ? elementNavigation.findOccurrence(
-        applicableSelectedElement.target,
-        before.snapshotId,
-      )
+          applicableSelectedElement.target,
+          before.snapshotId,
+        )
       : undefined;
   const afterElementOccurrence =
     applicableSelectedElement && elementNavigation && after
       ? elementNavigation.findOccurrence(
-        applicableSelectedElement.target,
-        after.snapshotId,
-      )
+          applicableSelectedElement.target,
+          after.snapshotId,
+        )
       : undefined;
   const beforeElementOffset =
     beforeElementOccurrence && beforeEntry?.version
       ? beforeElementOccurrence.version.dumpRange.start -
-      beforeEntry.version.dumpRange.start
+        beforeEntry.version.dumpRange.start
       : undefined;
   const afterElementOffset =
     afterElementOccurrence && afterEntry?.version
       ? afterElementOccurrence.version.dumpRange.start -
-      afterEntry.version.dumpRange.start
+        afterEntry.version.dumpRange.start
       : undefined;
   // NOTE: do not memoize these objects, or else this breaks and risks stale data.
   const matchAfterFunc = () =>
@@ -771,6 +794,10 @@ function App() {
               themeList={themeNamesArray}
               themeSet={themeNames}
               themeListLength={themeNamesArray.length}
+              hideRemovedSnapshots={hideRemovedSnapshots}
+              toggleHideRemovedSnapshots={() =>
+                setHideRemovedSnapshots(!hideRemovedSnapshots)
+              }
             />
           )}
           <button className="app__button" onClick={() => open()}>
@@ -807,6 +834,7 @@ function App() {
                   timelinesByTraceId={beforeTimelines}
                   selection={before}
                   active={activeSide === "before"}
+                  hideRemovedSnapshots={hideRemovedSnapshots}
                   onActivate={() => setActiveSide("before")}
                   onChange={updateBefore}
                   matchOtherSideFunc={matchAfterFunc}
@@ -819,6 +847,7 @@ function App() {
                   timelinesByTraceId={afterTimelines}
                   selection={after}
                   active={activeSide === "after"}
+                  hideRemovedSnapshots={hideRemovedSnapshots}
                   onActivate={() => setActiveSide("after")}
                   onChange={updateAfter}
                   matchOtherSideFunc={matchBeforeFunc}
@@ -949,8 +978,8 @@ function App() {
                       : "%"}
                     {applicableSelectedElement.target.number}
                     {lastElementChange &&
-                      lastElementChange.beforeSnapshotId === before?.snapshotId &&
-                      lastElementChange.afterSnapshotId === after?.snapshotId
+                    lastElementChange.beforeSnapshotId === before?.snapshotId &&
+                    lastElementChange.afterSnapshotId === after?.snapshotId
                       ? ` · ${lastElementChange.reasons.join(", ")}`
                       : beforeElementOccurrence && !afterElementOccurrence
                         ? " · absent from After"
@@ -959,9 +988,9 @@ function App() {
                           : beforeElementOccurrence && afterElementOccurrence
                             ? ""
                             : elementNavigation?.hasElementInTrace(
-                              applicableSelectedElement.target,
-                              applicableSelectedElement.traceId,
-                            )
+                                  applicableSelectedElement.target,
+                                  applicableSelectedElement.traceId,
+                                )
                               ? " · absent from both selected snapshots"
                               : " · never observed in this function and trace"}
                   </div>
@@ -993,8 +1022,9 @@ function App() {
                         ]
                           .filter(Boolean)
                           .join(" ")}
-                        title={`${snapshotLabel(entry.snapshot)}: ${entry.status}${isBeforeSelection ? " · Before" : ""
-                          }${isAfterSelection ? " · After" : ""}`}
+                        title={`${snapshotLabel(entry.snapshot)}: ${entry.status}${
+                          isBeforeSelection ? " · Before" : ""
+                        }${isAfterSelection ? " · After" : ""}`}
                         onClick={() => selectTimelineEntry(entry)}
                       >
                         <span className="timeline__marker" />
