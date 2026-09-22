@@ -1,13 +1,13 @@
 # Shermes IR Pass Viewer
 
-AI-Slopping up some dumps.
-
 This is a simple web app that lets you view the output of Shermes '-Xdump-between-passes' in a more convenient and interactive way.
-Sloppin' it up and is work in progress but it does work and has some basic features.
+AI-Sloppin' it up and is work in progress but it does work and has some basic features.
 
-It is used for debugging Shermes optimizer transformations
+It is used for debugging Shermes optimizer transformations.
 
 Uses Vite 8 so requires Node.js ^20.19.0 or >= 22.12.0
+
+There is a spec for the dump parser format, and I am working out some kinks in it but it is ok enough for use.
 
 ## Usage
 

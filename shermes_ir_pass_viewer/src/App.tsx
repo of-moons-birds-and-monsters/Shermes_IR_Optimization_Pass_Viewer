@@ -754,12 +754,14 @@ function App() {
           <h1>Shermes IR pass viewer</h1>
           {fileName && <span className="app__file-name">{fileName}</span>}
         </div>
-        <div>
+        <div></div>
+
+        <div className="button-container">
           <button
             onClick={() => toggleOptionsWindow()}
             className="base-element-style"
           >
-            options
+            Options
           </button>
           {optionsWindowOpen && (
             <OptionsWindow
@@ -771,9 +773,6 @@ function App() {
               themeListLength={themeNamesArray.length}
             />
           )}
-        </div>
-
-        <div className="button-container">
           <button className="app__button" onClick={() => open()}>
             Open dump file
           </button>
