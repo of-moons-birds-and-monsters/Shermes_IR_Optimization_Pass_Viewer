@@ -130,7 +130,10 @@ test("indexes basic blocks and only numbered instructions while hashing every in
     dump.slice(instruction.dumpRange.start, instruction.dumpRange.end),
     "  %0 = LoadConstInst (:number) 1: number",
   );
-  assert.equal(instruction.contentSha256, sha256("  %0 = LoadConstInst (:number) 1: number"));
+  assert.equal(
+    instruction.contentSha256,
+    sha256("  %0 = LoadConstInst (:number) 1: number"),
+  );
   assert.equal(
     firstBlock.contentSha256,
     sha256InstructionLines([
@@ -220,9 +223,9 @@ test("recognizes every function header kind and decodes quoted internal names", 
     "function global(): any",
     "base constructor Walker(id: number): undefined [typed]",
     "derived constructor Child(): undefined [typed]",
-    "arrow \"\"(): object",
-    "method \"name with spaces\"(): undefined",
-    "generator inner \"say\\x22hello 1#\"(action: number): any",
+    'arrow ""(): object',
+    'method "name with spaces"(): undefined',
+    'generator inner "say\\x22hello 1#"(action: number): any',
   ];
   const functions = headers.flatMap((header, index) => [
     header,
@@ -265,7 +268,10 @@ test("preserves CRLF and uses UTF-16 offsets around Unicode text", async () => {
     dump.slice(version.dumpRange.start, version.dumpRange.end),
     functionText,
   );
-  assert.equal(version.dumpRange.end, dump.indexOf("\r\n", version.dumpRange.start + functionText.length));
+  assert.equal(
+    version.dumpRange.end,
+    dump.indexOf("\r\n", version.dumpRange.start + functionText.length),
+  );
 });
 
 test("preserves a diagnostic preamble before the first trace", async () => {
@@ -318,4 +324,61 @@ test("returns diagnostics and a warning when compiler output contains no IR", as
     index.warnings?.map((warning) => warning.code),
     ["no-ir-snapshots"],
   );
+});
+
+test("recognizes functions with the 'unreachable' attribute", async () => {
+  const dump = [
+    "*** INITIAL STATE",
+    "",
+
+    "function at(index: any): any [allCallsitesKnownInStrictMode,unreachable]",
+    "%BB0:",
+    "  %0 = LoadParamInst (:any) %<this>: any",
+    "  %1 = GetParentScopeInst (:environment) %VS0: any, %parentScope: environment",
+    "  %3 = LoadParamInst (:any) %index: any",
+    '  %5 = TryLoadGlobalPropertyInst (:any) globalObject: object, "globalThis": string',
+    '  %6 = LoadPropertyInst (:any) %5: any, "String": string',
+    '  %7 = LoadPropertyInst (:any) %6: any, "prototype": string',
+    '  %8 = LoadPropertyInst (:any) %7: any, "at": string',
+    "  %10 = CallInst (:any) %8: any, empty: any, false: boolean, empty: any, undefined: undefined, %0: any, %3: any",
+    "        ReturnInst %10: any",
+    "function_end",
+    "",
+  ].join("\n");
+
+  const index = await buildDumpIndex(encoder.encode(dump));
+
+  assert.equal(index.functions.length, 1);
+  assert.equal(index.functions[0].internalName, "at");
+  //assert.equal(index.functions[0].unreachable, true);
+  assert.equal(index.functionVersions.length, 1);
+  assert.equal(index.functionVersions[0].unreachable, true);
+});
+test("recognizes functions without the  'unreachable' attribute", async () => {
+  const dump = [
+    "*** INITIAL STATE",
+    "",
+
+    "function at(index: any): any [allCallsitesKnownInStrictMode]",
+    "%BB0:",
+    "  %0 = LoadParamInst (:any) %<this>: any",
+    "  %1 = GetParentScopeInst (:environment) %VS0: any, %parentScope: environment",
+    "  %3 = LoadParamInst (:any) %index: any",
+    '  %5 = TryLoadGlobalPropertyInst (:any) globalObject: object, "globalThis": string',
+    '  %6 = LoadPropertyInst (:any) %5: any, "String": string',
+    '  %7 = LoadPropertyInst (:any) %6: any, "prototype": string',
+    '  %8 = LoadPropertyInst (:any) %7: any, "at": string',
+    "  %10 = CallInst (:any) %8: any, empty: any, false: boolean, empty: any, undefined: undefined, %0: any, %3: any",
+    "        ReturnInst %10: any",
+    "function_end",
+    "",
+  ].join("\n");
+
+  const index = await buildDumpIndex(encoder.encode(dump));
+
+  assert.equal(index.functions.length, 1);
+  assert.equal(index.functions[0].internalName, "at");
+  //assert.equal(index.functions[0].unreachable, true);
+  assert.equal(index.functionVersions.length, 1);
+  assert.equal(index.functionVersions[0].unreachable, false);
 });

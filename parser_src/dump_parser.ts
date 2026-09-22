@@ -98,7 +98,7 @@ export type FunctionVersion = {
   dumpRange: TextRange;
   headerRange: TextRange;
   contentSha256: string;
-  unreachable?: boolean;
+  unreachable: boolean;
 };
 export type BasicBlockVersion = {
   id: string;
@@ -390,7 +390,7 @@ export async function buildDumpIndex(
         dumpRange: { start: openFunction.start, end: line.contentEnd },
         headerRange: openFunction.headerRange,
         contentSha256: "",
-        ...(openFunction.unreachable ? { unreachable: true } : {}),
+        unreachable: openFunction.unreachable,
       });
       basicBlockVersions.push(...openFunction.blocks);
       instructionVersions.push(...openFunction.instructions);
@@ -440,7 +440,10 @@ export async function buildDumpIndex(
       });
     }
     addWarning("no-ir-snapshots", "No IR snapshots were found in the dump.");
-  } else if (firstTraceOffset > 0 && text.slice(0, firstTraceOffset).length > 0) {
+  } else if (
+    firstTraceOffset > 0 &&
+    text.slice(0, firstTraceOffset).length > 0
+  ) {
     const preamble = text.slice(0, firstTraceOffset);
     diagnostics.push({
       id: "diagnostic:0",
@@ -523,7 +526,9 @@ function parseIrNumber(text: string, kind: string, line: DumpLine): number {
 
 function parseFunctionHeader(
   line: string,
-): { kind: (typeof FUNCTION_HEADER_KINDS)[number]; internalName: string } | undefined {
+):
+  | { kind: (typeof FUNCTION_HEADER_KINDS)[number]; internalName: string }
+  | undefined {
   for (const kind of FUNCTION_HEADER_KINDS) {
     const prefix = `${kind} `;
     if (!line.startsWith(prefix)) {
@@ -682,7 +687,10 @@ async function hashBasicBlockVersions(
     const encodedLines = (instructionLines.get(version.id) ?? []).map((line) =>
       encoder.encode(line),
     );
-    const size = encodedLines.reduce((total, line) => total + 8 + line.length, 0);
+    const size = encodedLines.reduce(
+      (total, line) => total + 8 + line.length,
+      0,
+    );
     const data = new Uint8Array(size);
     const view = new DataView(data.buffer);
     let offset = 0;

@@ -437,7 +437,7 @@ type FunctionVersion = {
   dumpRange: TextRange;
   headerRange: TextRange;
   contentSha256: string;
-  unreachable?: boolean;
+  unreachable: boolean;
 };
 ```
 
@@ -454,8 +454,10 @@ Requirements:
   within `dumpRange`.
 - `contentSha256` MUST hash the complete text addressed by `dumpRange`,
   including the header and body.
-- `unreachable`, when present, records that the emitted function is explicitly
-  represented as unreachable by the dump. Absence of the field means false.
+- `unreachable` MUST be set to `true` when the emitted function header contains the exact, case-sensitive `unreachable` function attribute.
+- `unreachable` MUST be set to `false` when the emitted function header does not contain the exact, case-sensitive `unreachable` function attribute.
+- The parser MUST inspect the function header's attribute list. Occurrences of the word `unreachable` in function names, parameters, types, comments, instructions, or other text MUST NOT affect this field.
+- `unreachable` is parsed directly from the emitted function header. It is not derived by comparing snapshots
 
 Function versions SHOULD be ordered first by their referenced snapshot's dump
 order and then by their appearance within that snapshot. Consumers MUST use
@@ -612,7 +614,6 @@ For a function in a module-scoped trace:
 - **changed**: present in both snapshots with different `contentSha256` values;
 - **removed**: present in the preceding snapshot and absent from the current
   snapshot;
-- **unreachable**: present with `FunctionVersion.unreachable` set to true.
 
 For a function-scoped trace:
 
@@ -730,7 +731,8 @@ This example satisfies the range and hash requirements of the format.
       "snapshotId": "snapshot-0-0",
       "dumpRange": { "start": 19, "end": 104 },
       "headerRange": { "start": 19, "end": 46 },
-      "contentSha256": "2d5e91a80b58fc97511c2c456330a185977b0067e1ea721cd35d86fd343b616a"
+      "contentSha256": "2d5e91a80b58fc97511c2c456330a185977b0067e1ea721cd35d86fd343b616a",
+      "unreachable": false
     }
   ],
   "basicBlockVersions": [
