@@ -510,6 +510,94 @@ button {
   white-space: nowrap;
 }
 
+.timeline-provenance__scroll {
+  margin-top: 0.7rem;
+  overflow-x: auto;
+  padding: 0.2rem 0 0.55rem;
+}
+
+.timeline-provenance__canvas {
+  position: relative;
+  width: max-content;
+  min-height: 100%;
+}
+
+.timeline-provenance__connectors {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.timeline-provenance__connectors path {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 2px;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--gold), transparent 45%));
+}
+
+.timeline-provenance__row {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 11rem auto;
+  align-items: start;
+  min-height: 4.3rem;
+  padding: 0.35rem 0;
+}
+
+.timeline-provenance__row + .timeline-provenance__row {
+  border-top: 1px dashed color-mix(in srgb, var(--border), transparent 30%);
+}
+
+.timeline-provenance__label {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  display: grid;
+  gap: 0.2rem;
+  align-self: stretch;
+  align-content: start;
+  padding: 0.2rem 0.8rem 0.2rem 0;
+  background: linear-gradient(
+    90deg,
+    var(--surface-raised) 82%,
+    transparent
+  );
+}
+
+.timeline-provenance__label strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.76rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timeline-provenance__label span {
+  color: var(--muted);
+  font-size: 0.66rem;
+}
+
+.timeline__track--provenance {
+  margin: 0;
+  overflow: visible;
+  padding: 0.15rem 0 0.45rem;
+}
+
+.timeline__entry--inline-source .timeline__marker {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold), transparent 72%);
+}
+
+.timeline__entry--inline-target .timeline__marker {
+  border-color: var(--yellow);
+  background: var(--gold);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold), transparent 65%);
+}
+
 .monaco-editor.focused {
   border-width: 2px;
   border-color: blueviolet;

@@ -95,6 +95,11 @@ The Timeline
 - Entries are [snapshots](#terms) in [dump](#terms) order within one trace.
 - Before and After selections are marked on the timeline.
 - Clicking a timeline entry changes the active sides snapshot
+- When recognized inlining provenance exists, `Open full timeline` expands the
+  compact single-function timeline into multiple rows. Gold branch paths join
+  each source function's `AFTER Inlining` snapshot to the terminal function and
+  snapshot reached by the chronological inlining chain. `Close full timeline`
+  restores the compact timeline without changing either comparison selection.
 
 ### Function and Snapshot Selection
 

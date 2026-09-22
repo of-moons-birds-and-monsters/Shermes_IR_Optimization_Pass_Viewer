@@ -462,8 +462,12 @@ Initial presentation is implemented: the status banner for a callee's
 and lists the resulting terminal destinations. Thus
 `main -> " 1#" -> "" -> global` displays `global`, rather than the temporary
 direct destination `" 1#"`. Repeated paths to the same terminal destination
-are grouped by callsite count. Branching timeline visualization, destination
-navigation, full path display, and optional follow-on-advance behavior remain
+are grouped by callsite count. The optional full-timeline view is also
+implemented: it renders the current function as the root row, terminal
+functions as additional timeline rows, and connects the source and terminal
+`AFTER Inlining` snapshots with branch paths in one horizontally scrolling
+canvas. The compact view remains the default. Destination navigation, display
+of every intermediate path node, and optional follow-on-advance behavior remain
 open parts of this ticket.
 
 ## 14. Specify lifecycle filtering after proven removal

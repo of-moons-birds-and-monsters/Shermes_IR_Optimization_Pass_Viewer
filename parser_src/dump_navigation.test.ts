@@ -168,6 +168,7 @@ test("attaches outgoing inlining events to the callee's after-pass timeline entr
       functionId: index.functions.find(
         (identity) => identity.internalName === "caller",
       )?.id,
+      snapshotId: index.traceSegments[0].snapshots[1].id,
       callsiteCount: 2,
     },
   ]);
@@ -199,6 +200,7 @@ test("follows later inlining events to the final destination", async () => {
     {
       internalName: "global",
       functionId: global.id,
+      snapshotId: index.traceSegments[0].snapshots[1].id,
       callsiteCount: 1,
     },
   ]);

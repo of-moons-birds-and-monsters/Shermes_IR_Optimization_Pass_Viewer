@@ -28,6 +28,7 @@ export type TimelineEntry = {
 export type InliningDestination = {
   internalName: string;
   functionId?: string;
+  snapshotId: string;
   callsiteCount: number;
 };
 // Location of a function removal
@@ -338,33 +339,41 @@ function terminalInliningDestinations(
 ): InliningDestination[] {
   const terminals = new Map<
     string,
-    { internalName: string; functionId?: string; callsiteCount: number }
+    InliningDestination
   >();
 
   const addTerminal = (
     internalName: string,
     functionId: string | undefined,
+    snapshotId: string,
   ): void => {
-    const key = functionId ?? `name:${internalName}`;
+    const key = `${functionId ?? `name:${internalName}`}\0${snapshotId}`;
     const current = terminals.get(key);
     if (current) current.callsiteCount += 1;
-    else terminals.set(key, { internalName, functionId, callsiteCount: 1 });
+    else
+      terminals.set(key, {
+        internalName,
+        functionId,
+        snapshotId,
+        callsiteCount: 1,
+      });
   };
 
   const follow = (
     internalName: string,
     functionId: string | undefined,
     afterOrdinal: number,
+    destinationSnapshotId: string,
   ): void => {
     if (!functionId) {
-      addTerminal(internalName, undefined);
+      addTerminal(internalName, undefined, destinationSnapshotId);
       return;
     }
     const laterEvents = (
       cache.inliningEventsByCalleeFunctionId.get(functionId) ?? []
     ).filter((event) => event.ordinal > afterOrdinal);
     if (laterEvents.length === 0) {
-      addTerminal(internalName, functionId);
+      addTerminal(internalName, functionId, destinationSnapshotId);
       return;
     }
     for (const event of laterEvents) {
@@ -372,6 +381,7 @@ function terminalInliningDestinations(
         event.caller.internalName,
         event.caller.functionId,
         event.ordinal,
+        event.afterSnapshotId,
       );
     }
   };
@@ -381,6 +391,7 @@ function terminalInliningDestinations(
       event.caller.internalName,
       event.caller.functionId,
       event.ordinal,
+      event.afterSnapshotId,
     );
   }
   return [...terminals.values()];
