@@ -66,6 +66,9 @@ type SideSelectorProps = {
   matchOtherSideTrace: () => void;
 };
 
+function timelineEntryLabel(entry: TimelineEntry): string {
+  return entry.unreachable ? `${entry.status} · unreachable` : entry.status;
+}
 function SideSelector({
   side,
   index,
@@ -134,9 +137,14 @@ function SideSelector({
             {index.traceSegments.map((trace) => (
               <optgroup key={trace.id} label={traceLabel(trace)}>
                 {(timelinesByTraceId.get(trace.id) ?? []).map((entry) => (
-                  <option key={entry.snapshot.id} value={entry.snapshot.id}>
+                  <option
+                    className="snapshot-dropdown-option"
+                    key={entry.snapshot.id}
+                    value={entry.snapshot.id}
+                  >
                     {entry.snapshot.ordinal + 1}.{" "}
-                    {snapshotLabel(entry.snapshot)} · {entry.status}
+                    {snapshotLabel(entry.snapshot)} ·{" "}
+                    {timelineEntryLabel(entry)}
                   </option>
                 ))}
               </optgroup>
@@ -955,13 +963,20 @@ function App() {
                     return (
                       <button
                         key={entry.snapshot.id}
-                        className={`timeline__entry timeline__entry--${entry.status}${isComparisonSelection
+                        className={[
+                          `timeline__entry timeline__entry--${entry.status}`,
+                          entry.unreachable
+                            ? "timeline__entry--unreachable"
+                            : "",
+                          isComparisonSelection
                             ? " timeline__entry--comparison-selected"
-                            : ""
-                          }${entry.snapshot.id === activeSelection?.snapshotId
+                            : "",
+                          entry.snapshot.id === activeSelection?.snapshotId
                             ? " timeline__entry--selected"
-                            : ""
-                          }`}
+                            : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
                         title={`${snapshotLabel(entry.snapshot)}: ${entry.status}${isBeforeSelection ? " · Before" : ""
                           }${isAfterSelection ? " · After" : ""}`}
                         onClick={() => selectTimelineEntry(entry)}

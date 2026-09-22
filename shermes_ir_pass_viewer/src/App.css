@@ -47,6 +47,10 @@ button {
   flex: 0 0 auto;
 }
 
+.snapshot-dropdown-option {
+  color: var(--yellow);
+}
+
 .accordion-button {
   display: inline-flex;
   width: 2em;
@@ -471,6 +475,12 @@ button {
 .timeline__entry--changed .timeline__marker,
 .timeline__entry--present .timeline__marker {
   border-color: var(--green);
+}
+
+.timeline__entry--unreachable .timeline__marker {
+  box-shadow:
+    0 0 0 2px var(--red),
+    0 0 8px rgb(from var(--red) r g b / 65%);
 }
 
 .timeline__entry--introduced .timeline__marker,

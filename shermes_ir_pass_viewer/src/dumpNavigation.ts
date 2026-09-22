@@ -12,7 +12,6 @@ export type LifecycleStatus =
   | "introduced"
   | "changed"
   | "unchanged"
-  | "unreachable"
   | "removed"
   | "unknown"
   | "unavailable";
@@ -20,6 +19,7 @@ export type TimelineEntry = {
   snapshot: Snapshot;
   version?: FunctionVersion;
   status: LifecycleStatus;
+  unreachable: boolean;
 };
 
 export type DumpNavigationCache = {
@@ -157,9 +157,10 @@ export function timelineFor(
       : undefined;
 
     let status: LifecycleStatus;
-    if (version?.unreachable) {
-      status = "unreachable";
-    } else if (version && previousVersion) {
+    //if (version?.unreachable) {
+    //  status = "unreachable";
+    //} else if (version && previousVersion) {
+    if (version && previousVersion) {
       status =
         version.contentSha256 === previousVersion.contentSha256
           ? "unchanged"
@@ -184,6 +185,9 @@ export function timelineFor(
     } else {
       status = "unavailable";
     }
+    if (version?.unreachable) {
+      status;
+    }
 
     if (version) {
       previouslyPresent = true;
@@ -192,7 +196,7 @@ export function timelineFor(
       previouslyPresent = false;
       previouslyRemoved = true;
     }
-    return { snapshot, version, status };
+    return { snapshot, version, status, unreachable: version?.unreachable };
   });
   return timeline;
 }
