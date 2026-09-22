@@ -143,3 +143,63 @@ test("advances both selections to the next pair with different contents", async 
     undefined,
   );
 });
+
+test("attaches outgoing inlining events to the callee's after-pass timeline entry", async () => {
+  const dump = [
+    "*** INITIAL STATE", "", fn("callee"), "", fn("caller"), "",
+    "Inlining function 'callee' input.ts:2:1 into function 'caller' input.ts:6:1",
+    "Inlining function 'callee' input.ts:2:1 into function 'caller' input.ts:6:1",
+    "*** AFTER Inlining", "", fn("callee"), "", fn("caller"), "",
+  ].join("\n");
+  const index = await buildDumpIndex(encoder.encode(dump));
+  const cache = createDumpNavigationCache(index);
+  const callee = index.functions.find(
+    (identity) => identity.internalName === "callee",
+  );
+  assert.ok(callee);
+
+  const timeline = timelineFor(index.traceSegments[0], callee.id, cache);
+  assert.equal(timeline[0].inliningEvents.length, 0);
+  assert.equal(timeline[1].inliningEvents.length, 2);
+  assert.equal(timeline[1].inliningEvents[0].caller.internalName, "caller");
+  assert.deepEqual(timeline[1].terminalInliningDestinations, [
+    {
+      internalName: "caller",
+      functionId: index.functions.find(
+        (identity) => identity.internalName === "caller",
+      )?.id,
+      callsiteCount: 2,
+    },
+  ]);
+});
+
+test("follows later inlining events to the final destination", async () => {
+  const dump = [
+    "*** INITIAL STATE", "", fn("main"), "", fn("wrapper"), "",
+    fn("anonymousWrapper"), "", fn("global"), "",
+    "Inlining function 'main' input.ts:8:1 into function 'wrapper' input.ts:1:1",
+    "Inlining function 'wrapper' input.ts:1:1 into function 'anonymousWrapper' input.ts:1:1",
+    "Inlining function 'anonymousWrapper' input.ts:1:1 into function 'global' input.ts:1:1",
+    "*** AFTER Inlining", "", fn("main"), "", fn("wrapper"), "",
+    fn("anonymousWrapper"), "", fn("global"), "",
+  ].join("\n");
+  const index = await buildDumpIndex(encoder.encode(dump));
+  const cache = createDumpNavigationCache(index);
+  const main = index.functions.find(
+    (identity) => identity.internalName === "main",
+  );
+  const global = index.functions.find(
+    (identity) => identity.internalName === "global",
+  );
+  assert.ok(main);
+  assert.ok(global);
+
+  const afterInlining = timelineFor(index.traceSegments[0], main.id, cache)[1];
+  assert.deepEqual(afterInlining.terminalInliningDestinations, [
+    {
+      internalName: "global",
+      functionId: global.id,
+      callsiteCount: 1,
+    },
+  ]);
+});

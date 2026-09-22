@@ -382,3 +382,79 @@ test("recognizes functions without the  'unreachable' attribute", async () => {
   assert.equal(index.functionVersions.length, 1);
   assert.equal(index.functionVersions[0].unreachable, false);
 });
+
+test("indexes successful inlining debug records on the following Inlining snapshot", async () => {
+  const eventLine =
+    "Inlining function 'callee' source file.ts:4:2 into function '' source file.ts:1:1";
+  const dump = [
+    "*** INITIAL STATE",
+    "",
+    "function callee(): undefined",
+    "%BB0:",
+    "       ReturnInst undefined: undefined",
+    "function_end",
+    "",
+    'function ""(): undefined',
+    "%BB0:",
+    "       ReturnInst undefined: undefined",
+    "function_end",
+    "",
+    "Running the module pass Inlining",
+    "Visiting function 'callee'",
+    "Heuristic: do inline function 'callee': has 0 instructions (requires <= 53)",
+    eventLine,
+    "*** AFTER Inlining",
+    "",
+    "function callee(): undefined",
+    "%BB0:",
+    "       ReturnInst undefined: undefined",
+    "function_end",
+    "",
+    'function ""(): undefined',
+    "%BB0:",
+    "       ReturnInst undefined: undefined",
+    "function_end",
+    "",
+  ].join("\n");
+
+  const index = await buildDumpIndex(encoder.encode(dump));
+  const event = index.inliningEvents?.[0];
+  assert.ok(event);
+  assert.equal(index.inliningEvents?.length, 1);
+  assert.equal(event.beforeSnapshotId, index.traceSegments[0].snapshots[0].id);
+  assert.equal(event.afterSnapshotId, index.traceSegments[0].snapshots[1].id);
+  assert.equal(event.callee.internalName, "callee");
+  assert.equal(event.callee.sourceCoordinate, "source file.ts:4:2");
+  assert.equal(event.callee.functionId, index.functions[0].id);
+  assert.equal(event.caller.internalName, "");
+  assert.equal(event.caller.sourceCoordinate, "source file.ts:1:1");
+  assert.equal(event.caller.functionId, index.functions[1].id);
+  assert.equal(
+    dump.slice(event.dumpRange.start, event.dumpRange.end),
+    eventLine,
+  );
+});
+
+test("keeps inlining events optional and ignores unrelated debug prose", async () => {
+  const dump = [
+    "*** INITIAL STATE",
+    "",
+    "function main(): undefined",
+    "%BB0:",
+    "       ReturnInst undefined: undefined",
+    "function_end",
+    "Visiting function 'main'",
+    "Heuristic: not inlining function 'main': has unknown callsites",
+    "*** AFTER Inlining",
+    "",
+    "function main(): undefined",
+    "%BB0:",
+    "       ReturnInst undefined: undefined",
+    "function_end",
+    "",
+  ].join("\n");
+
+  const index = await buildDumpIndex(encoder.encode(dump));
+  assert.equal(index.inliningEvents, undefined);
+  assert.equal(index.functionVersions.length, 2);
+});

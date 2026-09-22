@@ -204,25 +204,48 @@ function createFunctionTimelines(
 }
 
 function statusMessage(entry: TimelineEntry): string {
-  if (entry.unreachable === true) {
-    return "Function is marked unreachable";
-  }
+  let lifecycleMessage: string;
   switch (entry.status) {
     case "unchanged":
-      return "No change in this pass";
+      lifecycleMessage = "No change in this pass";
+      break;
     case "introduced":
-      return "Function introduced in this snapshot";
+      lifecycleMessage = "Function introduced in this snapshot";
+      break;
     case "removed":
-      return "Function removed before this snapshot";
+      lifecycleMessage = "Function removed before this snapshot";
+      break;
     case "unavailable":
-      return "Function unavailable in this trace";
+      lifecycleMessage = "Function unavailable in this trace";
+      break;
     case "unknown":
-      return "Invalid lifecycle gap; see parser warnings";
+      lifecycleMessage = "Invalid lifecycle gap; see parser warnings";
+      break;
     case "changed":
-      return "Function changed in this pass";
+      lifecycleMessage = "Function changed in this pass";
+      break;
     case "present":
-      return "Function present";
+      lifecycleMessage = "Function present";
+      break;
   }
+
+  const messages = [lifecycleMessage];
+  if (entry.unreachable) messages.push("Function is marked unreachable");
+
+  if (entry.terminalInliningDestinations.length > 0) {
+    const destinations = entry.terminalInliningDestinations.map(
+      ({ internalName, callsiteCount }) => {
+        const name = internalName || "(anonymous)";
+        return callsiteCount === 1
+          ? name
+          : `${name} (${callsiteCount} callsites)`;
+      },
+    );
+    messages.push(
+      `Function was ultimately inlined into ${destinations.join(", ")}`,
+    );
+  }
+  return messages.join(" · ");
 }
 
 const Greeting = memo(function Greeting({ name }: { name: string }) {

@@ -374,12 +374,20 @@ state if the identity is observed again and report an invariant warning.
 index, and what build flags, output streams, pass boundaries, source locations,
 and naming guarantees do they depend on?
 
-**Answer:** Open. Survey the supplied typed-class dump and every relevant
-`LLVM_DEBUG` emitter without assuming prose intended for humans is a stable
-format. At minimum inventory inlining, function analysis, DCE, stack
-promotion, load/store optimization, register allocation, and interval output.
-Capture representative lines, source emitters, ambiguity, and expected value
-for navigation in a linked research note.
+**Answer:** The successful-Inlining subset is resolved and implemented in
+[DEBUG_EVENT_GRAMMAR.md](DEBUG_EVENT_GRAMMAR.md). A successful event is the
+`Inlining function '<callee>' ... into function '<caller>' ...` line emitted by
+`Inlining.cpp`. It belongs to the transition from the snapshot current when the
+line is emitted to the immediately following `AFTER Inlining` snapshot.
+Visiting, heuristic, and rejection lines are not success events and remain raw
+unclassified text.
+
+The format is human-oriented `LLVM_DEBUG` prose: names and source coordinates
+are not formally escaped and no call-instruction identity is printed. The
+parser therefore preserves the exact range, retains equal-looking events by
+ordinal, and makes function-ID resolution optional. The supplied typed-class
+dump yields five events and no parser warnings. Surveying the remaining debug
+families has moved to ticket 15; TypeInference remains intentionally excluded.
 
 ## 10. Model direct and transitive inlining provenance
 
@@ -392,16 +400,23 @@ inlined into a caller, including anonymous/internal wrapper functions such as
 `" 1#"`, multiple callsites, repeated inlining, and transitive chains ending
 in `global`?
 
-**Answer:** Open. Prefer explicit inliner events over body-text similarity when
-the debug stream is available. The model must distinguish “inlined into” from
-“removed,” because the callee can remain present and can be inlined into more
-than one destination. Determine how event names and source locations resolve
-to `FunctionIdentity` records and what happens when they do not resolve
-uniquely.
+**Answer:** Use ordered direct `InliningEvent` records, each containing the
+trace, Before/After snapshot IDs, raw callee and caller internal names/source
+coordinates, optional resolved function IDs, and the raw text range. One record
+represents one reported callsite even if it is textually identical to another.
+Inlining is not removal: the callee may remain and may have multiple outgoing
+events.
+
+Transitive provenance is a derived ordered graph, not another persisted event:
+for example `main -> " 1#" -> "" -> global` follows direct events from the same
+pass transition in emission order. This graph describes copied provenance and
+must not claim exclusive movement of body text. Without `-debug`, later work
+may attempt conservative snapshot comparison, but it must be labeled inferred
+and must not replace explicit events when they exist.
 
 ## 11. Decide which non-inlining debug events become product features
 
-**Blocked by:** 9
+**Blocked by:** 15
 
 **Type:** Discuss
 
@@ -442,6 +457,15 @@ callee immediately before inlining and each destination immediately after it?
 transitive paths without claiming that textual movement is exclusive or that
 the original function was removed by the inlining event itself.
 
+Initial presentation is implemented: the status banner for a callee's
+`AFTER Inlining` timeline entry follows later direct events in ordinal order
+and lists the resulting terminal destinations. Thus
+`main -> " 1#" -> "" -> global` displays `global`, rather than the temporary
+direct destination `" 1#"`. Repeated paths to the same terminal destination
+are grouped by callsite count. Branching timeline visualization, destination
+navigation, full path display, and optional follow-on-advance behavior remain
+open parts of this ticket.
+
 ## 14. Specify lifecycle filtering after proven removal
 
 **Blocked by:** 8
@@ -475,6 +499,21 @@ element-navigation behavior is recorded in
 [ELEMENT_NAVIGATION.md](ELEMENT_NAVIGATION.md), and the lifecycle basis is
 recorded in [DUMP_INDEX_FORMAT.md](DUMP_INDEX_FORMAT.md) and
 [TRACE_CHRONOLOGY.md](TRACE_CHRONOLOGY.md).
+
+## 15. Survey remaining optimizer debug-event families
+
+**Blocked by:** Nothing
+
+**Type:** Research
+
+**Question:** Which debug records from `SimpleStackPromotion`, `Mem2Reg`,
+`FunctionAnalysis`, `Auditor`, `ResolveStaticRequire`, `DCE`, `SimpleMem2Reg`,
+`FuncSigOpts`, and `LowerBuiltinCalls` are stable and valuable enough to index?
+
+**Answer:** Open. Inventory every `LLVM_DEBUG` form, bind it to a pass
+transition where possible, and distinguish successful transformations from
+visiting, heuristic, rejection, and verifier prose. TypeInference is explicitly
+out of scope until a concrete viewer use appears.
 
 ## Proposed delivery order
 

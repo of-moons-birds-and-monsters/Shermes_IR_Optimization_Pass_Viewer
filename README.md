@@ -118,6 +118,13 @@ Within the snapshot dropdown you will see various snapshots labeled with states
 - **unreachable**: The code is present but dead, and called by no one and a later optimization may removed it or replace its contents with unreachable code (An actual Unreachable IR instrunction)
 - **present**: function is present in initial snapshot for the trace. The initial state will be marked with this.
 
+When a dump contains recognized Inlining debug events, the selected snapshot's
+status message follows later inlining events and names the terminal functions
+into which the current function was ultimately inlined. For example,
+`main -> " 1#" -> "" -> global` is displayed as `main` ultimately being
+inlined into `global`. Repeated paths reaching the same terminal function are
+grouped and displayed with their reported callsite count.
+
 The optional `Hide Removed Snapshots` setting keeps the first snapshot that
 establishes removal, but hides every later snapshot for that function. This
 also hides later `unavailable` entries when an earlier module-scoped trace has

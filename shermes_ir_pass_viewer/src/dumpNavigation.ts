@@ -1,6 +1,7 @@
 import type {
   DumpIndex,
   FunctionVersion,
+  InliningEvent,
   Snapshot,
   TraceSegment,
 } from "../../parser_src/dump_parser";
@@ -21,6 +22,13 @@ export type TimelineEntry = {
   status: LifecycleStatus;
   unreachable: boolean;
   afterRemovalBoundary: boolean;
+  inliningEvents: InliningEvent[];
+  terminalInliningDestinations: InliningDestination[];
+};
+export type InliningDestination = {
+  internalName: string;
+  functionId?: string;
+  callsiteCount: number;
 };
 // Location of a function removal
 export type RemovalBoundary = {
@@ -38,6 +46,8 @@ export type DumpNavigationCache = {
   removedBeforeFunctionAndTrace: Set<string>;
   firstProvenRemovalByFunctionId: Map<string, RemovalBoundary>;
   functionsReappearingAfterRemoval: Set<string>;
+  inliningEventsByCalleeAndAfterSnapshot: Map<string, InliningEvent[]>;
+  inliningEventsByCalleeFunctionId: Map<string, InliningEvent[]>;
 };
 
 export type NavigationPolicy = {
@@ -64,6 +74,8 @@ export function createDumpNavigationCache(
     removedBeforeFunctionAndTrace: new Set(),
     firstProvenRemovalByFunctionId: new Map(),
     functionsReappearingAfterRemoval: new Set(),
+    inliningEventsByCalleeAndAfterSnapshot: new Map(),
+    inliningEventsByCalleeFunctionId: new Map(),
   };
 
   for (const version of index.functionVersions) {
@@ -101,6 +113,20 @@ export function createDumpNavigationCache(
       cache.snapshotIdToTrace.set(snapshot.id, trace);
       cache.snapshotIdToPosition.set(snapshot.id, snapshotPosition);
     }
+  }
+  for (const event of index.inliningEvents ?? []) {
+    const functionId = event.callee.functionId;
+    if (!functionId) continue;
+    const key = compositeId(functionId, event.afterSnapshotId);
+    const events = cache.inliningEventsByCalleeAndAfterSnapshot.get(key);
+    if (events) events.push(event);
+    else cache.inliningEventsByCalleeAndAfterSnapshot.set(key, [event]);
+
+    const eventsForCallee = cache.inliningEventsByCalleeFunctionId.get(
+      functionId,
+    );
+    if (eventsForCallee) eventsForCallee.push(event);
+    else cache.inliningEventsByCalleeFunctionId.set(functionId, [event]);
   }
   indexFunctionLifecycle(index, cache);
   return cache;
@@ -282,6 +308,10 @@ export function timelineFor(
       previouslyPresent = false;
       previouslyRemoved = true;
     }
+    const inliningEvents =
+      cache.inliningEventsByCalleeAndAfterSnapshot.get(
+        compositeId(functionId, snapshot.id),
+      ) ?? [];
     return {
       snapshot,
       version,
@@ -292,9 +322,68 @@ export function timelineFor(
         snapshot.id,
         cache,
       ),
+      inliningEvents,
+      terminalInliningDestinations: terminalInliningDestinations(
+        inliningEvents,
+        cache,
+      ),
     };
   });
   return timeline;
+}
+
+function terminalInliningDestinations(
+  rootEvents: readonly InliningEvent[],
+  cache: DumpNavigationCache,
+): InliningDestination[] {
+  const terminals = new Map<
+    string,
+    { internalName: string; functionId?: string; callsiteCount: number }
+  >();
+
+  const addTerminal = (
+    internalName: string,
+    functionId: string | undefined,
+  ): void => {
+    const key = functionId ?? `name:${internalName}`;
+    const current = terminals.get(key);
+    if (current) current.callsiteCount += 1;
+    else terminals.set(key, { internalName, functionId, callsiteCount: 1 });
+  };
+
+  const follow = (
+    internalName: string,
+    functionId: string | undefined,
+    afterOrdinal: number,
+  ): void => {
+    if (!functionId) {
+      addTerminal(internalName, undefined);
+      return;
+    }
+    const laterEvents = (
+      cache.inliningEventsByCalleeFunctionId.get(functionId) ?? []
+    ).filter((event) => event.ordinal > afterOrdinal);
+    if (laterEvents.length === 0) {
+      addTerminal(internalName, functionId);
+      return;
+    }
+    for (const event of laterEvents) {
+      follow(
+        event.caller.internalName,
+        event.caller.functionId,
+        event.ordinal,
+      );
+    }
+  };
+
+  for (const event of rootEvents) {
+    follow(
+      event.caller.internalName,
+      event.caller.functionId,
+      event.ordinal,
+    );
+  }
+  return [...terminals.values()];
 }
 
 export function findTraceForSnapshot(

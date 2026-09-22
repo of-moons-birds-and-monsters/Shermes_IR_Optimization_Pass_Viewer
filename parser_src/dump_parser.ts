@@ -12,6 +12,7 @@ export type DumpIndex = {
   functionVersions: FunctionVersion[];
   basicBlockVersions: BasicBlockVersion[];
   instructionVersions: InstructionVersion[];
+  inliningEvents?: InliningEvent[];
   diagnostics: Diagnostic[];
   warnings?: ParseWarning[];
 };
@@ -121,6 +122,21 @@ export type InstructionVersion = {
   dumpRange: TextRange;
   contentSha256: string;
 };
+export type DebugFunctionReference = {
+  internalName: string;
+  functionId?: string;
+  sourceCoordinate: string;
+};
+export type InliningEvent = {
+  id: string;
+  ordinal: number;
+  traceId: string;
+  beforeSnapshotId: string;
+  afterSnapshotId: string;
+  callee: DebugFunctionReference;
+  caller: DebugFunctionReference;
+  dumpRange: TextRange;
+};
 export type Diagnostic = {
   id: string;
   dumpRange: TextRange;
@@ -157,6 +173,19 @@ type OpenFunction = {
   instructionOrdinal: number;
 };
 
+type ParsedInliningLine = {
+  calleeInternalName: string;
+  calleeSourceCoordinate: string;
+  callerInternalName: string;
+  callerSourceCoordinate: string;
+};
+
+type PendingInliningEvent = ParsedInliningLine & {
+  traceId: string;
+  beforeSnapshotId: string;
+  dumpRange: TextRange;
+};
+
 const FUNCTION_HEADER_KINDS = [
   "base constructor",
   "derived constructor",
@@ -169,7 +198,7 @@ const FUNCTION_HEADER_KINDS = [
 const DEFAULT_PRODUCER: Producer = {
   parser: {
     name: "ir-pass-viewer",
-    version: "0.2.0",
+    version: "0.3.0",
   },
 };
 
@@ -183,6 +212,7 @@ export async function buildDumpIndex(
   const functionVersions: FunctionVersion[] = [];
   const basicBlockVersions: BasicBlockVersion[] = [];
   const instructionVersions: InstructionVersion[] = [];
+  const inliningEvents: InliningEvent[] = [];
   const blockInstructionLines = new Map<string, string[]>();
   const diagnostics: Diagnostic[] = [];
   const warnings: ParseWarning[] = [];
@@ -193,6 +223,7 @@ export async function buildDumpIndex(
   let currentSnapshot: Snapshot | undefined;
   let currentPassOccurrences = new Map<string, number>();
   let openFunction: OpenFunction | undefined;
+  let pendingInliningEvents: PendingInliningEvent[] = [];
   let firstTraceOffset: number | undefined;
 
   const addWarning = (
@@ -237,6 +268,14 @@ export async function buildDumpIndex(
     const afterMatch = /^\*\*\* AFTER (.+)$/.exec(line.text);
 
     if (isInitial) {
+      if (pendingInliningEvents.length > 0) {
+        addWarning(
+          "unbound-inlining-event",
+          "Inlining debug output was not followed by an AFTER Inlining snapshot.",
+          pendingInliningEvents[0].dumpRange,
+        );
+        pendingInliningEvents = [];
+      }
       closeOpenFunctionAsWarning(line.start);
       closeSnapshot(line.start);
       closeTrace(line.start);
@@ -278,6 +317,7 @@ export async function buildDumpIndex(
         continue;
       }
 
+      const beforeSnapshot = currentSnapshot;
       closeSnapshot(line.start);
       const passName = afterMatch[1];
       const occurrence = currentPassOccurrences.get(passName) ?? 0;
@@ -292,6 +332,46 @@ export async function buildDumpIndex(
         dumpRange: { start: line.start, end: text.length },
       };
       currentTrace.snapshots.push(currentSnapshot);
+      if (pendingInliningEvents.length > 0) {
+        if (passName === "Inlining" && beforeSnapshot) {
+          for (const pending of pendingInliningEvents) {
+            inliningEvents.push({
+              id: `inlining-event:${inliningEvents.length}`,
+              ordinal: inliningEvents.length,
+              traceId: pending.traceId,
+              beforeSnapshotId: pending.beforeSnapshotId,
+              afterSnapshotId: currentSnapshot.id,
+              callee: {
+                internalName: pending.calleeInternalName,
+                sourceCoordinate: pending.calleeSourceCoordinate,
+              },
+              caller: {
+                internalName: pending.callerInternalName,
+                sourceCoordinate: pending.callerSourceCoordinate,
+              },
+              dumpRange: pending.dumpRange,
+            });
+          }
+        } else {
+          addWarning(
+            "unbound-inlining-event",
+            "Inlining debug output was not followed by an AFTER Inlining snapshot.",
+            pendingInliningEvents[0].dumpRange,
+          );
+        }
+        pendingInliningEvents = [];
+      }
+      continue;
+    }
+
+    const parsedInliningLine = parseInliningDebugLine(line.text);
+    if (parsedInliningLine && currentTrace && currentSnapshot) {
+      pendingInliningEvents.push({
+        ...parsedInliningLine,
+        traceId: currentTrace.id,
+        beforeSnapshotId: currentSnapshot.id,
+        dumpRange: { start: line.start, end: line.contentEnd },
+      });
       continue;
     }
 
@@ -428,6 +508,13 @@ export async function buildDumpIndex(
   }
 
   closeOpenFunctionAsWarning(text.length);
+  if (pendingInliningEvents.length > 0) {
+    addWarning(
+      "unbound-inlining-event",
+      "Inlining debug output was not followed by an AFTER Inlining snapshot.",
+      pendingInliningEvents[0].dumpRange,
+    );
+  }
   closeSnapshot(text.length);
   closeTrace(text.length);
 
@@ -460,6 +547,13 @@ export async function buildDumpIndex(
     addWarning,
   );
 
+  for (const event of inliningEvents) {
+    const callee = functionByInternalName.get(event.callee.internalName);
+    const caller = functionByInternalName.get(event.caller.internalName);
+    if (callee) event.callee.functionId = callee.id;
+    if (caller) event.caller.functionId = caller.id;
+  }
+
   const textSha256 = await sha256Hex(text);
   await hashFunctionVersions(text, functionVersions);
   await hashInstructionVersions(text, instructionVersions);
@@ -480,8 +574,23 @@ export async function buildDumpIndex(
     functionVersions,
     basicBlockVersions,
     instructionVersions,
+    ...(inliningEvents.length > 0 ? { inliningEvents } : {}),
     diagnostics,
     warnings,
+  };
+}
+
+function parseInliningDebugLine(line: string): ParsedInliningLine | undefined {
+  const match =
+    /^Inlining function '(.*?)' (.+?:\d+:\d+|none:0,0) into function '(.*?)' (.+?:\d+:\d+|none:0,0)$/.exec(
+      line,
+    );
+  if (!match) return undefined;
+  return {
+    calleeInternalName: match[1],
+    calleeSourceCoordinate: match[2],
+    callerInternalName: match[3],
+    callerSourceCoordinate: match[4],
   };
 }
 

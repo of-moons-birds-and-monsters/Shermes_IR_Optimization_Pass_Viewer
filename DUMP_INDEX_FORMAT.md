@@ -18,6 +18,7 @@ Pass Viewer. A dump index contains:
 - stable identities for functions found in the dump;
 - ranges locating each emitted function, basic-block, instruction version, and
   diagnostic in the embedded dump text.
+- optional recognized successful-inlining events from LLVM debug output.
 
 The format is the seam between the dump parser and all consumers, including the
 browser viewer and possible future editor or desktop adapters. Consumers do not
@@ -191,12 +192,17 @@ type DumpIndex = {
   functionVersions: FunctionVersion[];
   basicBlockVersions: BasicBlockVersion[];
   instructionVersions: InstructionVersion[];
+  inliningEvents?: InliningEvent[];
   diagnostics: Diagnostic[];
   warnings?: ParseWarning[];
 };
 ```
 
 All required arrays MUST be present even when empty.
+
+`inliningEvents` is optional because ordinary dumps do not contain LLVM debug
+output and older schema-version-2 producers do not recognize it. When present,
+it MUST contain every successfully recognized inlining event in dump order.
 
 The top-level `format` discriminator protects against accidentally opening an
 unrelated JSON document that happens to contain `schemaVersion: 2`.
@@ -552,7 +558,46 @@ assigned synthetic `InstructionVersion` identities.
 Instruction versions SHOULD follow function-version, block, and instruction
 dump order.
 
-## 16. Diagnostics and unclassified text
+## 16. Debug events, diagnostics, and unclassified text
+
+### 16.1 Recognized inlining events
+
+```ts
+type DebugFunctionReference = {
+  internalName: string;
+  functionId?: string;
+  sourceCoordinate: string;
+};
+
+type InliningEvent = {
+  id: string;
+  ordinal: number;
+  traceId: string;
+  beforeSnapshotId: string;
+  afterSnapshotId: string;
+  callee: DebugFunctionReference;
+  caller: DebugFunctionReference;
+  dumpRange: TextRange;
+};
+```
+
+An `InliningEvent` represents one successful callsite inlining reported by
+`Inlining.cpp`; it does not imply that the callee was removed. Requirements:
+
+- `ordinal` MUST be the zero-based position in dump order.
+- `dumpRange` MUST address the exact debug line without its line terminator.
+- `beforeSnapshotId` MUST identify the snapshot preceding the debug record.
+- `afterSnapshotId` MUST identify the immediately following `AFTER Inlining`
+  snapshot in the same trace.
+- `traceId` MUST identify the containing trace.
+- `internalName` and `sourceCoordinate` MUST preserve the emitted values.
+- `functionId` SHOULD be present when the internal name resolves uniquely and
+  MUST be omitted otherwise.
+- Equal-looking records MUST remain separate events because the current debug
+  format does not identify the individual call instruction.
+
+The complete observed grammar and its stability limitations are documented in
+`DEBUG_EVENT_GRAMMAR.md`.
 
 ```ts
 type Diagnostic = {
@@ -650,20 +695,22 @@ A conforming schema-version-2 document satisfies all of the following:
 5. Every identifier reference resolves.
 6. Trace and snapshot ordinals are ordered and contiguous.
 7. Every trace begins with exactly one initial snapshot.
-8. Snapshot and segment ranges follow dump order and their documented nesting.
-9. Every function version range is contained in its referenced snapshot range.
-10. Every function version header range is contained in its function version
+8. Every inlining-event trace, snapshot, and optional function reference
+   resolves, and its Before and After snapshots belong to its trace.
+9. Snapshot and segment ranges follow dump order and their documented nesting.
+10. Every function version range is contained in its referenced snapshot range.
+11. Every function version header range is contained in its function version
     range.
-11. Every function version content hash matches its addressed text.
-12. No snapshot contains two versions of the same function identity.
-13. Every function's `firstSeenSnapshotId` and `firstHeaderRange` identify its
+12. Every function version content hash matches its addressed text.
+13. No snapshot contains two versions of the same function identity.
+14. Every function's `firstSeenSnapshotId` and `firstHeaderRange` identify its
     earliest emitted version.
-14. Every block and instruction reference resolves to mutually consistent
+15. Every block and instruction reference resolves to mutually consistent
     containing entities.
-15. Every block and instruction range is contained by its documented parent
+16. Every block and instruction range is contained by its documented parent
     ranges.
-16. Block and instruction ordinals follow their documented ordering rules.
-17. Every block and instruction content hash matches its normative encoding.
+17. Block and instruction ordinals follow their documented ordering rules.
+18. Every block and instruction content hash matches its normative encoding.
 
 A consumer MAY continue with a document containing non-fatal parser warnings,
 but it MUST reject violated structural invariants that make identifier or range

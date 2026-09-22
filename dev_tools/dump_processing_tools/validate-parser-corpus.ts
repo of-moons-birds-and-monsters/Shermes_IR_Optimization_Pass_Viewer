@@ -18,6 +18,7 @@ type FileResult = {
   functionVersions: number;
   basicBlockVersions: number;
   instructionVersions: number;
+  inliningEvents: number;
   diagnostics: number;
   warnings: number;
   milliseconds: number;
@@ -54,6 +55,7 @@ for (const path of paths) {
     functionVersions: index.functionVersions.length,
     basicBlockVersions: index.basicBlockVersions.length,
     instructionVersions: index.instructionVersions.length,
+    inliningEvents: index.inliningEvents?.length ?? 0,
     diagnostics: index.diagnostics.length,
     warnings: index.warnings?.length ?? 0,
     milliseconds: Math.round((performance.now() - start) * 10) / 10,
@@ -73,6 +75,7 @@ process.stdout.write(
         functionVersions: sum(results, "functionVersions"),
         basicBlockVersions: sum(results, "basicBlockVersions"),
         instructionVersions: sum(results, "instructionVersions"),
+        inliningEvents: sum(results, "inliningEvents"),
         diagnostics: sum(results, "diagnostics"),
         warnings: sum(results, "warnings"),
         milliseconds: Math.round(sum(results, "milliseconds") * 10) / 10,
@@ -96,7 +99,13 @@ function validateIndex(index: DumpIndex): void {
       trace.snapshots.map((snapshot) => snapshot.id),
     ),
   );
+  const traceIdBySnapshotId = new Map(
+    index.traceSegments.flatMap((trace) =>
+      trace.snapshots.map((snapshot) => [snapshot.id, trace.id] as const),
+    ),
+  );
   const functionIds = new Set(index.functions.map((identity) => identity.id));
+  const traceIds = new Set(index.traceSegments.map((trace) => trace.id));
   const functionVersions = new Map(
     index.functionVersions.map((version) => [version.id, version]),
   );
@@ -203,6 +212,31 @@ function validateIndex(index: DumpIndex): void {
       throw new Error(`Duplicate instruction number for ${instruction.id}`);
     }
     instructionKeys.add(key);
+  }
+
+  for (const event of index.inliningEvents ?? []) {
+    if (!traceIds.has(event.traceId)) {
+      throw new Error(`Unknown trace for ${event.id}`);
+    }
+    if (
+      !snapshotIds.has(event.beforeSnapshotId) ||
+      !snapshotIds.has(event.afterSnapshotId)
+    ) {
+      throw new Error(`Unknown snapshot for ${event.id}`);
+    }
+    if (
+      traceIdBySnapshotId.get(event.beforeSnapshotId) !== event.traceId ||
+      traceIdBySnapshotId.get(event.afterSnapshotId) !== event.traceId
+    ) {
+      throw new Error(`Snapshot outside trace for ${event.id}`);
+    }
+    if (
+      (event.callee.functionId && !functionIds.has(event.callee.functionId)) ||
+      (event.caller.functionId && !functionIds.has(event.caller.functionId))
+    ) {
+      throw new Error(`Unknown function for ${event.id}`);
+    }
+    assertRange(index.dump.text, event.dumpRange, event.id);
   }
 }
 
