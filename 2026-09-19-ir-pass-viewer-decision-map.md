@@ -219,8 +219,9 @@ Do not infer a new removal merely by flattening all trace segments into one
 sequence. A function absent from another function's trace is merely
 unavailable. Module pass managers do run sequentially over the same module,
 however, so a removal already established in one module-scoped trace remains
-removed in later module-scoped traces until the function is observed again.
-Do not carry that conclusion into a function-scoped or unknown-scoped trace.
+known in every later trace until the function is observed again. This includes
+function-scoped and unknown-scoped traces: absence there cannot establish a new
+removal, but it does not invalidate a removal already proven by a module trace.
 Under the current dumping behavior, a stable function identity should not have
 a present/absent/present gap within one trace. If a fixture violates that
 invariant, preserve the unknown state and report a parser warning rather than
@@ -451,10 +452,29 @@ the original function was removed by the inlining event itself.
 `unavailable` entries based on a removal established in an earlier trace, and
 how is that inferred state explained or reversed if the function reappears?
 
-**Answer:** Open. Keep the existing conservative behavior until ticket 8
-establishes the permitted scopes and chronology. Name the option according to
-what it actually hides rather than silently broadening “removed” to ambiguous
-absence.
+**Answer:** Resolved and implemented. `Hide Removed Snapshots` establishes a
+per-function boundary only when consecutive snapshots in a module-scoped trace
+prove removal. The boundary snapshot remains visible because it represents the
+lifecycle change. Every strictly later snapshot is hidden for that function,
+including entries whose local trace status remains `unavailable`; those entries
+are hidden using carried lifecycle knowledge, not reclassified as new
+removals.
+
+The same optional policy governs forward navigation. Single-snapshot, linked
+snapshot, next-difference, and next-element-change navigation may reach the
+boundary but cannot advance beyond it. Backward navigation is unrestricted.
+When the option is enabled while a selected side is already beyond the
+boundary, that side is moved back to the boundary. Disabling the option restores
+ordinary navigation without changing `DumpIndex`.
+
+The removal boundary and the per-entry `afterRemovalBoundary` flag are derived
+navigation-cache data, not persisted schema fields. If the identity later
+reappears, the current implementation conservatively disables boundary
+filtering for that function rather than hiding valid observations. Normative
+element-navigation behavior is recorded in
+[ELEMENT_NAVIGATION.md](ELEMENT_NAVIGATION.md), and the lifecycle basis is
+recorded in [DUMP_INDEX_FORMAT.md](DUMP_INDEX_FORMAT.md) and
+[TRACE_CHRONOLOGY.md](TRACE_CHRONOLOGY.md).
 
 ## Proposed delivery order
 

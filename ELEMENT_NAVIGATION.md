@@ -195,6 +195,50 @@ Implementations SHOULD pre-index occurrences by function, element kind,
 number, and snapshot. They MUST NOT repeatedly scan raw function text during UI
 rendering.
 
+### 9.1 Optional function-removal boundary
+
+A consumer MAY provide an optional forward-navigation policy equivalent to:
+
+```ts
+type NavigationPolicy = {
+  stopAfterRemovalBoundary: boolean;
+};
+```
+
+The policy is disabled when `stopAfterRemovalBoundary` is `false`. Search then
+has the unrestricted behavior defined above.
+
+A removal boundary is the first module-scoped snapshot where the containing
+function is absent after being present in the immediately preceding snapshot.
+Function-scoped and unknown-scoped absence MUST NOT establish this boundary.
+Once established, the boundary applies to later traces in the same
+uninterrupted dump even when the function's local status there is
+`unavailable`: this carries forward an already proven removal and does not
+infer a new removal from incomplete trace coverage.
+
+When `stopAfterRemovalBoundary` is `true`:
+
+- forward element-change navigation MAY return a transition whose After side
+  is the removal-boundary snapshot;
+- it MUST NOT return a transition whose Before or After selection is strictly
+  later than the boundary;
+- when no permitted later result exists, it MUST return `undefined`, and a UI
+  SHOULD disable the corresponding forward-navigation control;
+- backward navigation is unaffected and MAY cross the boundary toward earlier
+  snapshots.
+
+Consequently, an instruction or block removed together with its containing
+function remains navigable as a `removed` change at the boundary. Results after
+that point are suppressed while the policy is enabled. Disabling the policy
+MUST restore ordinary forward navigation without rebuilding or changing the
+persisted `DumpIndex`.
+
+If the same function identity is observed after its recorded boundary, the
+carried removal is no longer reliable. A consumer MUST stop applying the
+boundary to later observations and SHOULD report an invariant warning. A
+conservative implementation MAY disable boundary filtering for that function
+entirely rather than attempting to construct multiple removal intervals.
+
 ## 10. Presentation
 
 Applying a result MUST select its `beforeSnapshotId` and `afterSnapshotId` for
