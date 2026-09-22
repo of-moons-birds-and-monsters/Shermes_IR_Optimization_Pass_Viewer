@@ -7,7 +7,7 @@ Sloppin' it up and is work in progress but it does work and has some basic featu
 
 It is used for debugging Shermes optimizer transformations
 
-Uses Vite 8 so requires Node.js ^20.19.0 >= 22.12.0
+Uses Vite 8 so requires Node.js ^20.19.0 or >= 22.12.0
 
 ## Usage
 
@@ -115,18 +115,19 @@ Within the snapshot dropdown you will see various snapshots labeled with states
 - **changed**: present in both snapshots with different `contentSha256` values;
 - **removed**: present in the preceding snapshot and absent from the current
   snapshot;
-- **unreachable**: present with `FunctionVersion.unreachable` set to true in the dump. The viewer itself does not infer why, but some common reasons are it might have been removed by an optimization pass or had their code moved to other functions
+- **unreachable**: The code is present but dead, and called by no one and a later optimization may removed it or replace its contents with unreachable code (An actual Unreachable IR instrunction)
 - **present**: function is present in initial snapshot for the trace. The initial state will be marked with this.
 
 ### Navigation
 
 `Previous snapshot` && `Next snapshot` Move the active sides snapshot backwards or forwards one snapshot relative to the current active snapshot.
 
-The remaining options are only active when you are on the same function and same trace i both windows
+Both of these options require you to be on the same trace.
 `Both Forwards 1` moves both sides forward by one snapshot
 
 `Both Backwards 1` moves both sides backwards by one snapshot
 
+The remaining options are only active when you are on the same function and same trace.
 Both of these will be greyed out if one side has no snapshot to move to.
 
 In order for the `Next element change`, `Previous element change`, `Advance to next difference` , and `Go to previous difference` to work you must
@@ -189,11 +190,17 @@ Example: If you wanted to select the `%BB0` label you would enter `%BB0` into th
 #### What are changes?
 
 These are also spelled out in the navigation specification **ELEMENT_NAVIGATION.md**
+Changes are technically not semantic differences. This viewer and parser have no semantic awareness of the IR. Changes are based on position, instruction/basic block text content
+, and relative ordering.
 
 **Instruction changes**
-For instructions changes are not perfect. The changes are not aware of IR semantics. Additionally to prevent a lot of false positives positional changes are relative
+Tracking of instruction changes is not perfect. The changes are not aware of IR semantics. Additionally to prevent a lot of false positives positional changes are tracked
+relative to the previous snapshot, so just adding a new instruction above an old one will not be detected as a change.
+
 Instruction changes are when
 
+- the instruction is absent in the before snapshot but present in the after snapshot (added)
+- the instruction is present in the before snapshot but absent in the after snapshot (removed)
 - the content of the instruction has been changed (content is hashed and compared to previous snapshots content)
 - the instruction is moved between basic blocks
 - when the basic block in unchanged by the relative order of the instructions does change
@@ -233,18 +240,23 @@ and we insert a `PrStoreInst` before BEFORE `%4` that writes to `%2` `
 ```ll
 PrStoreInst %6: number, %2: object, 0: number, "i": string, true: boolean
 %4 = (Does something with %2) %2, %3
-%6
+%5
 ```
 
-**`%1` will not have moved relative to the existing value , `%2`, in the previous snapshot so no change will be reported**
-**The system does not look at the IR semantics so even though `%1` has been changed by the new write, `PrStoreInst`, to its operand, no change will be reported**
+**`%4` will not have moved relative to the existing value , `%6`, in the previous snapshot so no change will be reported**
+**The system does not look at the IR semantics when considering changes so even though `%4` has had one of its operands changed by the new write, `PrStoreInst`,
+no change will be reported**
 
 **Basic block changes**
 
 basic block changes are similar to instruction changes but simpler.,
 
-- the content of the block has changed (content is hashed and this are compared)
+- the content of the existing block has changed between snapshots (content is hashed and this are compared)
+- the block is added (absent in before snapshot but present in after snapshot)
+- the block is removed (present in before snapshot but absent in after snapshot)
+  l
 - changed relative order among blocks present in both snapshots
+
   So if we have 2 basic blocks
 
 ```ll
@@ -267,11 +279,14 @@ If, instead of reordering the blocks, we just inserted a new block before `%BB0`
 %BB1:
 ```
 
+%BB1 and %BB2 are not considered reordered relative to each other, so they would not be considered a change.
+
 ELEMENT_NAVIGATION.md is a specification file for the navigation, not technically instructions, so look for clearer instructions here in the future
 
-## Components
+## Components and Specifications
 
-There are two main components with this project.
+There are two main components with this project
+**Components**
 
 1. The dump parser.
 
@@ -281,6 +296,8 @@ There are two main components with this project.
 2. The UI.
 
 The parser is integrated with the UI, just press the `Open dump file` button and the parser will run
+
+**Specifications**
 The parser also has a standalone spec its based on , `DUMP_INDEX_FORMAT.md`
 
 The spec explains the format and expected contents of the index it creates from the dump
@@ -291,10 +308,10 @@ other languages easier.
 There is a separate spec for some of the navigation features `ELEMENT_NAVIGATION.md`
 It tries to define things like "what are changes between basic block" in a basic way
 
-3. Dump Index Specification `DUMP_INDEX_FORMAT.md`
+1. Dump Index Specification `DUMP_INDEX_FORMAT.md`
    This is the parser output spec.
 
-4. Element Navigation Specification `ELEMENT_NAVIGATION.md`
+2. Element Navigation Specification `ELEMENT_NAVIGATION.md`
    The Element Navigation spec defines the navigation features and how they are meant to work
 
 ## Future work
