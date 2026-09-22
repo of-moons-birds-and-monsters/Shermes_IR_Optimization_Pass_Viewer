@@ -18,7 +18,9 @@ import { themeNamesArray } from "./themeNames";
 const baseThemeFileLocation = "../vendored_libs/tm-themes/themes/";
 function loadTheme(themeName: string): Promise<ThemeRegistrationResolved> {
   try {
-    return import(`${baseThemeFileLocation}${themeName}.json`).then((data) => {
+    return import(
+      /*@vite-ignore*/ `${baseThemeFileLocation}${themeName}.json`
+    ).then((data) => {
       return data;
     });
   } catch (e) {
