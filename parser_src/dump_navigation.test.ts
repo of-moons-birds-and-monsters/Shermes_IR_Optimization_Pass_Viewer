@@ -74,6 +74,11 @@ test("carries only an established removal into later module traces", async () =>
   assert.equal(timelineFor(index.traceSegments[1], target.id, cache)[0].status, "removed");
   assert.equal(timelineFor(index.traceSegments[2], target.id, cache)[0].status, "unavailable");
   assert.equal(timelineFor(index.traceSegments[3], target.id, cache)[0].status, "present");
+  assert.equal(
+    timelineFor(index.traceSegments[3], target.id, cache)[0]
+      .afterRemovalBoundary,
+    false,
+  );
 });
 
 test("does not infer a new removal only from a later module trace absence", async () => {

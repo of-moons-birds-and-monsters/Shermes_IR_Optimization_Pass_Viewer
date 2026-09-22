@@ -20,6 +20,7 @@ export type TimelineEntry = {
   version?: FunctionVersion;
   status: LifecycleStatus;
   unreachable: boolean;
+  afterRemovalBoundary: boolean;
 };
 // Location of a function removal
 export type RemovalBoundary = {
@@ -35,7 +36,16 @@ export type DumpNavigationCache = {
   snapshotIdToTrace: Map<string, TraceSegment>;
   snapshotIdToPosition: Map<string, number>;
   removedBeforeFunctionAndTrace: Set<string>;
-  firstProvenRemovalByFunctionId: Map<string, RemovalBoundary>; // for a particular function this is the first trace id , and snapshot id where the function was marked removed
+  firstProvenRemovalByFunctionId: Map<string, RemovalBoundary>;
+  functionsReappearingAfterRemoval: Set<string>;
+};
+
+export type NavigationPolicy = {
+  stopAfterRemovalBoundary: boolean;
+};
+
+const defaultNavigationPolicy: NavigationPolicy = {
+  stopAfterRemovalBoundary: false,
 };
 
 function compositeId(functionId: string, snapshotId: string): string {
@@ -52,6 +62,8 @@ export function createDumpNavigationCache(
     snapshotIdToTrace: new Map(),
     snapshotIdToPosition: new Map(),
     removedBeforeFunctionAndTrace: new Set(),
+    firstProvenRemovalByFunctionId: new Map(),
+    functionsReappearingAfterRemoval: new Set(),
   };
 
   for (const version of index.functionVersions) {
@@ -90,11 +102,55 @@ export function createDumpNavigationCache(
       cache.snapshotIdToPosition.set(snapshot.id, snapshotPosition);
     }
   }
-  indexPriorModuleRemovals(index, cache);
+  indexFunctionLifecycle(index, cache);
   return cache;
 }
+export function isAfterRemovalBoundary(
+  functionId: string,
+  snapshotId: string,
+  cache: DumpNavigationCache,
+): boolean {
+  if (cache.functionsReappearingAfterRemoval.has(functionId)) return false;
+  const boundary = cache.firstProvenRemovalByFunctionId.get(functionId);
+  if (!boundary) return false;
+  return snapshotIsAfterBoundary(snapshotId, boundary, cache);
+}
 
-function indexPriorModuleRemovals(
+function snapshotIsAfterBoundary(
+  snapshotId: string,
+  boundary: RemovalBoundary,
+  cache: DumpNavigationCache,
+): boolean {
+  const currentTrace = cache.snapshotIdToTrace.get(snapshotId);
+  if (!currentTrace) return false;
+  if (currentTrace.ordinal !== boundary.traceOrdinal) {
+    return currentTrace.ordinal > boundary.traceOrdinal;
+  }
+  const currentPosition = cache.snapshotIdToPosition.get(snapshotId);
+  const boundaryPosition = cache.snapshotIdToPosition.get(boundary.snapshotId);
+  return (
+    currentPosition !== undefined &&
+    boundaryPosition !== undefined &&
+    currentPosition > boundaryPosition
+  );
+}
+
+function selectionAllowedByPolicy(
+  selection: Selection,
+  cache: DumpNavigationCache,
+  policy: NavigationPolicy,
+): boolean {
+  return (
+    !policy.stopAfterRemovalBoundary ||
+    !isAfterRemovalBoundary(
+      selection.functionId,
+      selection.snapshotId,
+      cache,
+    )
+  );
+}
+
+function indexFunctionLifecycle(
   index: DumpIndex,
   cache: DumpNavigationCache,
 ): void {
@@ -108,31 +164,40 @@ function indexPriorModuleRemovals(
     if (trace.scope.kind !== "module") continue;
 
     const seenInTrace = new Set<string>();
-    //let currentSnapshotId: string | undefined = new Set();
-    let seenInPreviousSnapshot: Set<string> | undefined = undefined;
+    let seenInPreviousSnapshot: Set<string> | undefined;
+
     for (const snapshot of trace.snapshots) {
-      const functionsInCurrentSnapshot = new Set<string>();
-      const versions = cache.functionVersionsBySnapshotId.get(snapshot.id);
-      if (versions) {
-        for (const functionId of versions.keys()) {
-          functionsInCurrentSnapshot.add(functionId);
-          seenInTrace.add(functionId);
+      const functionsInCurrentSnapshot = new Set(
+        cache.functionVersionsBySnapshotId.get(snapshot.id)?.keys() ?? [],
+      );
+
+      for (const functionId of functionsInCurrentSnapshot) {
+        seenInTrace.add(functionId);
+        const boundary = cache.firstProvenRemovalByFunctionId.get(functionId);
+        if (
+          boundary &&
+          snapshotIsAfterBoundary(snapshot.id, boundary, cache)
+        ) {
+          cache.functionsReappearingAfterRemoval.add(functionId);
         }
-        if (seenInPreviousSnapshot) {
-          for (const functionId of functionsInCurrentSnapshot) {
-            if (!seenInPreviousSnapshot.has(functionId)) {
-              if (!cache.firstProvenRemovalByFunctionId.has(functionId)) {
-                cache.firstProvenRemovalByFunctionId.set(functionId, {
-                  traceOrdinal: trace.ordinal,
-                  snapshotOrdinal: snapshot.ordinal,
-                  snapshotId: snapshot.id,
-                });
-              }
-            }
+      }
+
+      if (seenInPreviousSnapshot) {
+        for (const functionId of seenInPreviousSnapshot) {
+          if (
+            !functionsInCurrentSnapshot.has(functionId) &&
+            !cache.firstProvenRemovalByFunctionId.has(functionId)
+          ) {
+            cache.firstProvenRemovalByFunctionId.set(functionId, {
+              traceOrdinal: trace.ordinal,
+              snapshotOrdinal: snapshot.ordinal,
+              snapshotId: snapshot.id,
+            });
           }
         }
-        seenInPreviousSnapshot = functionsInCurrentSnapshot;
       }
+
+      seenInPreviousSnapshot = functionsInCurrentSnapshot;
     }
     const finalSnapshot = trace.snapshots.at(-1);
     const presentAtEnd = finalSnapshot
@@ -210,10 +275,6 @@ export function timelineFor(
     } else {
       status = "unavailable";
     }
-    if (version?.unreachable) {
-      status;
-    }
-
     if (version) {
       previouslyPresent = true;
       previouslyRemoved = false;
@@ -221,7 +282,17 @@ export function timelineFor(
       previouslyPresent = false;
       previouslyRemoved = true;
     }
-    return { snapshot, version, status, unreachable: version?.unreachable };
+    return {
+      snapshot,
+      version,
+      status,
+      unreachable: version?.unreachable ?? false,
+      afterRemovalBoundary: isAfterRemovalBoundary(
+        functionId,
+        snapshot.id,
+        cache,
+      ),
+    };
   });
   return timeline;
 }
@@ -288,6 +359,7 @@ export function advanceSelectionsTogether(
   before: Selection,
   after: Selection,
   cache: DumpNavigationCache,
+  policy: NavigationPolicy = defaultNavigationPolicy,
 ): { before: Selection; after: Selection } | undefined {
   const beforeTrace = cache.snapshotIdToTrace.get(before.snapshotId);
   const afterTrace = cache.snapshotIdToTrace.get(after.snapshotId);
@@ -299,10 +371,14 @@ export function advanceSelectionsTogether(
   const nextBefore = beforeTrace.snapshots[beforePosition + 1];
   const nextAfter = beforeTrace.snapshots[afterPosition + 1];
   if (!nextBefore || !nextAfter) return undefined;
-  return {
+  const result = {
     before: { ...before, snapshotId: nextBefore.id },
     after: { ...after, snapshotId: nextAfter.id },
   };
+  return selectionAllowedByPolicy(result.before, cache, policy) &&
+    selectionAllowedByPolicy(result.after, cache, policy)
+    ? result
+    : undefined;
 }
 export function moveSelectionsBackwardsTogether(
   before: Selection,
@@ -329,6 +405,7 @@ export function advanceSelectionsToNextDifference(
   before: Selection,
   after: Selection,
   cache: DumpNavigationCache,
+  policy: NavigationPolicy = defaultNavigationPolicy,
 ): { before: Selection; after: Selection } | undefined {
   const trace = cache.snapshotIdToTrace.get(before.snapshotId);
   const afterTrace = cache.snapshotIdToTrace.get(after.snapshotId);
@@ -343,6 +420,14 @@ export function advanceSelectionsToNextDifference(
     const nextBefore = trace.snapshots[beforePosition + offset];
     const nextAfter = trace.snapshots[afterPosition + offset];
     if (!nextBefore || !nextAfter) return undefined;
+    const nextBeforeSelection = { ...before, snapshotId: nextBefore.id };
+    const nextAfterSelection = { ...after, snapshotId: nextAfter.id };
+    if (
+      !selectionAllowedByPolicy(nextBeforeSelection, cache, policy) ||
+      !selectionAllowedByPolicy(nextAfterSelection, cache, policy)
+    ) {
+      return undefined;
+    }
     const beforeVersion = cache.functionVersionByCompositeId.get(
       compositeId(before.functionId, nextBefore.id),
     );
@@ -355,8 +440,8 @@ export function advanceSelectionsToNextDifference(
       Boolean(beforeVersion) !== Boolean(afterVersion)
     ) {
       return {
-        before: { ...before, snapshotId: nextBefore.id },
-        after: { ...after, snapshotId: nextAfter.id },
+        before: nextBeforeSelection,
+        after: nextAfterSelection,
       };
     }
   }

@@ -30,6 +30,7 @@ import {
   defaultSelections,
   findTraceForSnapshot,
   functionText,
+  isAfterRemovalBoundary,
   moveSelectionsBackwardsTogether,
   moveSelectionsToPreviousDifference,
   snapshotForFunctionChange,
@@ -113,8 +114,6 @@ function SideSelector({
       onChange({ functionId, snapshotId });
     }
   };
-  let foundFirstRemoved = false;
-
   return (
     <section
       className={`side-selector${active ? " side-selector--active" : ""}`}
@@ -157,11 +156,11 @@ function SideSelector({
             {index.traceSegments.map((trace) => (
               <optgroup key={trace.id} label={traceLabel(trace)}>
                 {(timelinesByTraceId.get(trace.id) ?? []).map((entry) => {
-                  if (hideRemovedSnapshots && entry.status === "removed") {
-                    if (foundFirstRemoved) {
-                      return null;
-                    }
-                    foundFirstRemoved = true;
+                  if (
+                    hideRemovedSnapshots &&
+                    entry.afterRemovalBoundary
+                  ) {
+                    return null;
                   }
                   return (
                     <option
@@ -568,6 +567,7 @@ function App() {
 
   const selectTimelineEntry = (entry: TimelineEntry) => {
     if (!activeSelection) return;
+    if (hideRemovedSnapshots && entry.afterRemovalBoundary) return;
     const selection = { ...activeSelection, snapshotId: entry.snapshot.id };
     if (activeSide === "before") updateBefore(selection);
     else updateAfter(selection);
@@ -578,7 +578,26 @@ function App() {
     const current = cache.snapshotIdToPosition.get(activeSelection.snapshotId);
     if (current === undefined) return;
     const next = timeline[current + offset];
-    if (next) selectTimelineEntry(next);
+    if (next && !(hideRemovedSnapshots && next.afterRemovalBoundary)) {
+      selectTimelineEntry(next);
+    }
+  };
+
+  const previousTimelineEntry =
+    activeSelection && cache
+      ? timeline[
+          (cache.snapshotIdToPosition.get(activeSelection.snapshotId) ?? 0) - 1
+        ]
+      : undefined;
+  const nextTimelineEntry =
+    activeSelection && cache
+      ? timeline[
+          (cache.snapshotIdToPosition.get(activeSelection.snapshotId) ?? -1) +
+            1
+        ]
+      : undefined;
+  const navigationPolicy = {
+    stopAfterRemovalBoundary: hideRemovedSnapshots,
   };
 
   const selectionsShareTrace = Boolean(
@@ -586,7 +605,7 @@ function App() {
   );
   const nextSelections =
     cache && before && after
-      ? advanceSelectionsTogether(before, after, cache)
+      ? advanceSelectionsTogether(before, after, cache, navigationPolicy)
       : undefined;
   const previousSelections =
     cache && before && after
@@ -598,7 +617,12 @@ function App() {
       : undefined;
   const nextDifferenceSelections =
     cache && before && after && after.functionId === before.functionId
-      ? advanceSelectionsToNextDifference(before, after, cache)
+      ? advanceSelectionsToNextDifference(
+          before,
+          after,
+          cache,
+          navigationPolicy,
+        )
       : undefined;
 
   const moveBackwards = () => {
@@ -682,18 +706,35 @@ function App() {
         : undefined,
     [applicableSelectedElement, before, elementNavigation],
   );
-  const nextElementChange = useMemo(
-    () =>
-      applicableSelectedElement && elementNavigation && after
-        ? elementNavigation.findElementChange(
-            applicableSelectedElement.target,
-            applicableSelectedElement.initialAnchorSnapshotId ??
-              after.snapshotId,
-            "next",
-          )
-        : undefined,
-    [after, applicableSelectedElement, elementNavigation],
-  );
+  const nextElementChange = useMemo(() => {
+    if (!applicableSelectedElement || !elementNavigation || !after) {
+      return undefined;
+    }
+    const change = elementNavigation.findElementChange(
+      applicableSelectedElement.target,
+      applicableSelectedElement.initialAnchorSnapshotId ?? after.snapshotId,
+      "next",
+    );
+    if (
+      change &&
+      hideRemovedSnapshots &&
+      cache &&
+      isAfterRemovalBoundary(
+        applicableSelectedElement.target.functionId,
+        change.afterSnapshotId,
+        cache,
+      )
+    ) {
+      return undefined;
+    }
+    return change;
+  }, [
+    after,
+    applicableSelectedElement,
+    cache,
+    elementNavigation,
+    hideRemovedSnapshots,
+  ]);
 
   const applyElementChange = (change: ElementChange | undefined) => {
     if (!change || !applicableSelectedElement) return;
@@ -770,6 +811,34 @@ function App() {
     });
   };
   const toggleOptionsWindow = () => setOptionsWindowOpen(!optionsWindowOpen);
+  const toggleHideRemovedSnapshots = () => {
+    const nextValue = !hideRemovedSnapshots;
+    if (nextValue && cache) {
+      if (
+        before &&
+        isAfterRemovalBoundary(before.functionId, before.snapshotId, cache)
+      ) {
+        const boundary = cache.firstProvenRemovalByFunctionId.get(
+          before.functionId,
+        );
+        if (boundary) {
+          updateBefore({ ...before, snapshotId: boundary.snapshotId });
+        }
+      }
+      if (
+        after &&
+        isAfterRemovalBoundary(after.functionId, after.snapshotId, cache)
+      ) {
+        const boundary = cache.firstProvenRemovalByFunctionId.get(
+          after.functionId,
+        );
+        if (boundary) {
+          updateAfter({ ...after, snapshotId: boundary.snapshotId });
+        }
+      }
+    }
+    setHideRemovedSnapshots(nextValue);
+  };
   return (
     <main className="app">
       <header className="app__header">
@@ -795,9 +864,7 @@ function App() {
               themeSet={themeNames}
               themeListLength={themeNamesArray.length}
               hideRemovedSnapshots={hideRemovedSnapshots}
-              toggleHideRemovedSnapshots={() =>
-                setHideRemovedSnapshots(!hideRemovedSnapshots)
-              }
+              toggleHideRemovedSnapshots={toggleHideRemovedSnapshots}
             />
           )}
           <button className="app__button" onClick={() => open()}>
@@ -926,10 +993,20 @@ function App() {
                         </button>
                       </>
                     )}
-                    <button onClick={() => stepTimeline(-1)}>
+                    <button
+                      disabled={!previousTimelineEntry}
+                      onClick={() => stepTimeline(-1)}
+                    >
                       Previous snapshot
                     </button>
-                    <button onClick={() => stepTimeline(1)}>
+                    <button
+                      disabled={
+                        !nextTimelineEntry ||
+                        (hideRemovedSnapshots &&
+                          nextTimelineEntry.afterRemovalBoundary)
+                      }
+                      onClick={() => stepTimeline(1)}
+                    >
                       Next snapshot
                     </button>
                   </div>

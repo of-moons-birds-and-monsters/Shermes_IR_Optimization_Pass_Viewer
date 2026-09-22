@@ -625,11 +625,13 @@ absence.
 
 A function absent from an unrelated trace segment is **unavailable**. Consumers
 MUST NOT flatten trace segments and interpret cross-segment absence as a new
-removal. A removal already established in a module-scoped trace MAY be carried
-forward to a later module-scoped trace because those traces observe successive
-states of the same module. It MUST NOT be carried into a function-scoped or
-unknown-scoped trace, where the function may simply be outside the dump's
-coverage.
+removal. Once disappearance within a module-scoped trace has established a
+removal, a consumer MAY carry that knowledge through every later trace in the
+same uninterrupted dump. This includes function-scoped and unknown-scoped
+traces: their absence does not establish a new removal, but it also does not
+invalidate the already established removal. If that function identity is later
+observed again, the carried state MUST end and the consumer SHOULD report an
+invariant warning.
 
 Under the currently observed Shermes dump behavior, an unchanged applicable
 function is still emitted. A present/absent/present gap for the same function

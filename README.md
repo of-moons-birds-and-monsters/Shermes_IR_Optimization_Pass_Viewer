@@ -118,6 +118,14 @@ Within the snapshot dropdown you will see various snapshots labeled with states
 - **unreachable**: The code is present but dead, and called by no one and a later optimization may removed it or replace its contents with unreachable code (An actual Unreachable IR instrunction)
 - **present**: function is present in initial snapshot for the trace. The initial state will be marked with this.
 
+The optional `Hide Removed Snapshots` setting keeps the first snapshot that
+establishes removal, but hides every later snapshot for that function. This
+also hides later `unavailable` entries when an earlier module-scoped trace has
+already proven that the function was removed. While enabled, forward snapshot,
+difference, and element-change navigation may reach the removal snapshot but
+cannot advance beyond it. Enabling the setting while viewing a later snapshot
+moves that side back to the removal snapshot.
+
 ### Navigation
 
 `Previous snapshot` && `Next snapshot` Move the active sides snapshot backwards or forwards one snapshot relative to the current active snapshot.
