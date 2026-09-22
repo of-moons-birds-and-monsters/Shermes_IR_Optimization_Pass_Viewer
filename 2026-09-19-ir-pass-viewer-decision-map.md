@@ -340,6 +340,122 @@ UI to wrap. It can provide native file access and the optional generic command
 runner from step 4. Revisit packaging only after the browser workflow is
 working; do not make Tauri a prerequisite for parser or UI development.
 
+## 8. Prove cross-trace chronology and lifecycle carry-forward
+
+**Blocked by:** Nothing
+
+**Type:** Research
+
+**Question:** Does global dump order guarantee that every later trace observes
+the output module state left by every earlier trace, and under exactly which
+trace scopes may a previously established removal be carried forward to
+replace later `unavailable` states?
+
+**Answer:** Resolved in [TRACE_CHRONOLOGY.md](TRACE_CHRONOLOGY.md). The current
+Shermes driver and Static Hermes backend run their pass managers synchronously
+and in order over the same module, and each pass manager emits its dumps inline.
+No binary instrumentation is needed to establish chronology.
+
+Chronology does not imply complete coverage. Only disappearance within a
+module-scoped trace can establish a new removal. Once established, however,
+that removal may be carried through every later trace in the same uninterrupted
+dump, including function-scoped and unknown-scoped traces: this carries earlier
+knowledge rather than inferring absence from partial coverage. End the carried
+state if the identity is observed again and report an invariant warning.
+
+## 9. Define the debug-event grammar and stability boundary
+
+**Blocked by:** Nothing
+
+**Type:** Research
+
+**Question:** Which `-debug` output records are machine-recognizable enough to
+index, and what build flags, output streams, pass boundaries, source locations,
+and naming guarantees do they depend on?
+
+**Answer:** Open. Survey the supplied typed-class dump and every relevant
+`LLVM_DEBUG` emitter without assuming prose intended for humans is a stable
+format. At minimum inventory inlining, function analysis, DCE, stack
+promotion, load/store optimization, register allocation, and interval output.
+Capture representative lines, source emitters, ambiguity, and expected value
+for navigation in a linked research note.
+
+## 10. Model direct and transitive inlining provenance
+
+**Blocked by:** 9
+
+**Type:** Discuss
+
+**Question:** What identity and event model can represent a callee being
+inlined into a caller, including anonymous/internal wrapper functions such as
+`" 1#"`, multiple callsites, repeated inlining, and transitive chains ending
+in `global`?
+
+**Answer:** Open. Prefer explicit inliner events over body-text similarity when
+the debug stream is available. The model must distinguish “inlined into” from
+“removed,” because the callee can remain present and can be inlined into more
+than one destination. Determine how event names and source locations resolve
+to `FunctionIdentity` records and what happens when they do not resolve
+uniquely.
+
+## 11. Decide which non-inlining debug events become product features
+
+**Blocked by:** 9
+
+**Type:** Discuss
+
+**Question:** Which debug-event families justify persistent index records and
+UI navigation rather than remaining searchable raw diagnostics?
+
+**Answer:** Open. Rank each family by debugging value, parse reliability,
+identity resolution, and UI cost. Do not add one generic “optimizer event”
+abstraction until the concrete event families show which fields they actually
+share.
+
+## 12. Place compiler debug events in the interchange schema
+
+**Blocked by:** 8, 10, 11
+
+**Type:** Discuss
+
+**Question:** Should debug output become structured `DumpIndex` data, a
+separate optional companion index, or remain ranges into the embedded dump;
+and does the chosen representation require a new schema version?
+
+**Answer:** Open. Preserve raw text and ranges even for recognized events.
+Keep parsing UI-independent, make absence of `-debug` output normal, and avoid
+making human-oriented LLVM debug prose mandatory for opening ordinary dumps.
+
+## 13. Prototype provenance navigation and presentation
+
+**Blocked by:** 10, 12
+
+**Type:** Prototype
+
+**Question:** How should the viewer show that `main` was inlined through
+internal wrappers into `global`, and how should a user navigate between the
+callee immediately before inlining and each destination immediately after it?
+
+**Answer:** Open. Exercise the design first on
+`typedClass_modifiedByUntypedCode_dump.ll`. The UI must show direct and
+transitive paths without claiming that textual movement is exclusive or that
+the original function was removed by the inlining event itself.
+
+## 14. Specify lifecycle filtering after proven removal
+
+**Blocked by:** 8
+
+**Type:** Discuss
+
+**Question:** When may the “hide removed snapshots” option also hide later
+`unavailable` entries based on a removal established in an earlier trace, and
+how is that inferred state explained or reversed if the function reappears?
+
+**Answer:** Open. Keep the existing conservative behavior until ticket 8
+establishes the permitted scopes and chronology. Name the option according to
+what it actually hides rather than silently broadening “removed” to ambiguous
+absence.
+
 ## Proposed delivery order
 
 1. Parser fixtures and `DumpIndex` CLI.
@@ -349,3 +465,7 @@ working; do not make Tauri a prerequisite for parser or UI development.
 5. Optional Tauri packaging and generic command runner.
 6. Normalized diff experiments only in response to observed diff noise.
 7. Neovim or VS Code adapter based on actual usage.
+8. Source-backed trace chronology and debug-event survey.
+9. Optional inlining-provenance index and navigation prototype.
+10. Additional debug-event features only after the survey establishes value
+    and stability.
