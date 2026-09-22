@@ -65,9 +65,26 @@ type SideSelectorProps = {
   matchOtherSideFunc: () => void;
   matchOtherSideTrace: () => void;
 };
-
+function generateTimeStatusSymbol(entry: TimelineEntry): string {
+  switch (entry.status) {
+    case "changed":
+      return "●";
+    case "unchanged":
+      return "○";
+    case "removed":
+      return "−";
+    case "introduced":
+      return "+";
+    case "present":
+      return "✓";
+    default:
+      return "";
+  }
+}
 function timelineEntryLabel(entry: TimelineEntry): string {
-  return entry.unreachable ? `${entry.status} · unreachable` : entry.status;
+  return entry.unreachable
+    ? `[${generateTimeStatusSymbol(entry)} ${entry.status.toUpperCase()} · ⚠ UNREACHABLE]`
+    : `[${generateTimeStatusSymbol(entry)} ${entry.status.toUpperCase()}]`;
 }
 function SideSelector({
   side,
