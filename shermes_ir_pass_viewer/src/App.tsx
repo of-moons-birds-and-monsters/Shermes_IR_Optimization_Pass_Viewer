@@ -30,6 +30,7 @@ import {
   defaultSelections,
   findTraceForSnapshot,
   functionText,
+  moveSelectionsBackwardsTogether,
   moveSelectionsToPreviousDifference,
   snapshotForFunctionChange,
   snapshotLabel,
@@ -61,7 +62,8 @@ type SideSelectorProps = {
   timelinesByTraceId: Map<string, TimelineEntry[]>;
   onActivate: () => void;
   onChange: (selection: Selection) => void;
-  matchOtherSide: () => void;
+  matchOtherSideFunc: () => void;
+  matchOtherSideTrace: () => void;
 };
 
 function SideSelector({
@@ -73,7 +75,8 @@ function SideSelector({
   timelinesByTraceId,
   onActivate,
   onChange,
-  matchOtherSide,
+  matchOtherSideFunc: matchOtherSide,
+  matchOtherSideTrace,
 }: SideSelectorProps) {
   const selectedTrace = cache.snapshotIdToTrace.get(selection.snapshotId);
   const selectedPosition = cache.snapshotIdToPosition.get(selection.snapshotId);
@@ -97,8 +100,12 @@ function SideSelector({
     >
       <header className="side-selector__heading">
         <h2>{side === "before" ? "Before" : "After"}</h2>
+
         <button onClick={() => matchOtherSide()}>
-          Match {side === "before" ? "After" : "Before"}
+          Match {side === "before" ? "After" : "Before"} Function
+        </button>
+        <button onClick={() => matchOtherSideTrace()}>
+          Match {side === "before" ? "After" : "Before"} Trace
         </button>
       </header>
 
@@ -403,10 +410,10 @@ function App() {
 
   const applicableSelectedElement =
     selectedElement &&
-    before?.functionId === selectedElement.target.functionId &&
-    after?.functionId === selectedElement.target.functionId &&
-    beforeTrace?.id === selectedElement.traceId &&
-    afterTrace?.id === selectedElement.traceId
+      before?.functionId === selectedElement.target.functionId &&
+      after?.functionId === selectedElement.target.functionId &&
+      beforeTrace?.id === selectedElement.traceId &&
+      afterTrace?.id === selectedElement.traceId
       ? selectedElement
       : undefined;
 
@@ -420,7 +427,7 @@ function App() {
       selectedElement &&
       (selection.functionId !== selectedElement.target.functionId ||
         cache?.snapshotIdToTrace.get(selection.snapshotId)?.id !==
-          selectedElement.traceId)
+        selectedElement.traceId)
     ) {
       clearElementSelection();
     } else if (selectedElement) {
@@ -438,7 +445,7 @@ function App() {
       selectedElement &&
       (selection.functionId !== selectedElement.target.functionId ||
         cache?.snapshotIdToTrace.get(selection.snapshotId)?.id !==
-          selectedElement.traceId)
+        selectedElement.traceId)
     ) {
       clearElementSelection();
     } else if (selectedElement) {
@@ -533,6 +540,10 @@ function App() {
     cache && before && after
       ? advanceSelectionsTogether(before, after, cache)
       : undefined;
+  const previousSelections =
+    cache && before && after
+      ? moveSelectionsBackwardsTogether(before, after, cache)
+      : undefined;
   const previousDifferenceSelections =
     cache && before && after && after.functionId === before.functionId
       ? moveSelectionsToPreviousDifference(before, after, cache)
@@ -542,6 +553,11 @@ function App() {
       ? advanceSelectionsToNextDifference(before, after, cache)
       : undefined;
 
+  const moveBackwards = () => {
+    if (!previousSelections) return;
+    updateBefore(previousSelections.before);
+    updateAfter(previousSelections.after);
+  };
   const advanceBoth = () => {
     if (!nextSelections) return;
 
@@ -610,11 +626,11 @@ function App() {
     () =>
       applicableSelectedElement && elementNavigation && before
         ? elementNavigation.findElementChange(
-            applicableSelectedElement.target,
-            applicableSelectedElement.initialAnchorSnapshotId ??
-              before.snapshotId,
-            "previous",
-          )
+          applicableSelectedElement.target,
+          applicableSelectedElement.initialAnchorSnapshotId ??
+          before.snapshotId,
+          "previous",
+        )
         : undefined,
     [applicableSelectedElement, before, elementNavigation],
   );
@@ -622,11 +638,11 @@ function App() {
     () =>
       applicableSelectedElement && elementNavigation && after
         ? elementNavigation.findElementChange(
-            applicableSelectedElement.target,
-            applicableSelectedElement.initialAnchorSnapshotId ??
-              after.snapshotId,
-            "next",
-          )
+          applicableSelectedElement.target,
+          applicableSelectedElement.initialAnchorSnapshotId ??
+          after.snapshotId,
+          "next",
+        )
         : undefined,
     [after, applicableSelectedElement, elementNavigation],
   );
@@ -651,42 +667,61 @@ function App() {
   const beforeElementOccurrence =
     applicableSelectedElement && elementNavigation && before
       ? elementNavigation.findOccurrence(
-          applicableSelectedElement.target,
-          before.snapshotId,
-        )
+        applicableSelectedElement.target,
+        before.snapshotId,
+      )
       : undefined;
   const afterElementOccurrence =
     applicableSelectedElement && elementNavigation && after
       ? elementNavigation.findOccurrence(
-          applicableSelectedElement.target,
-          after.snapshotId,
-        )
+        applicableSelectedElement.target,
+        after.snapshotId,
+      )
       : undefined;
   const beforeElementOffset =
     beforeElementOccurrence && beforeEntry?.version
       ? beforeElementOccurrence.version.dumpRange.start -
-        beforeEntry.version.dumpRange.start
+      beforeEntry.version.dumpRange.start
       : undefined;
   const afterElementOffset =
     afterElementOccurrence && afterEntry?.version
       ? afterElementOccurrence.version.dumpRange.start -
-        afterEntry.version.dumpRange.start
+      afterEntry.version.dumpRange.start
       : undefined;
   // NOTE: do not memoize these objects, or else this breaks and risks stale data.
-  const matchAfter = () =>
+  const matchAfterFunc = () =>
     updateBefore({
       functionId: after!.functionId,
       snapshotId: before!.snapshotId,
     });
 
-  const matchBefore = () =>
+  const matchBeforeFunc = () =>
     updateAfter({
       functionId: before!.functionId,
       snapshotId: after!.snapshotId,
     });
 
+  const matchAfterTrace = () => {
+    const newPos = cache!.snapshotIdToPosition.get(after!.snapshotId)!;
+    const trace = cache!.snapshotIdToTrace.get(after!.snapshotId)!;
+    updateBefore({
+      functionId: before!.functionId,
+      snapshotId:
+        newPos > 0 ? trace.snapshots[newPos - 1].id : after!.snapshotId,
+    });
+  };
+  const matchBeforeTrace = () => {
+    const newPos = cache!.snapshotIdToPosition.get(before!.snapshotId)!;
+    const trace = cache!.snapshotIdToTrace.get(before!.snapshotId)!;
+    updateAfter({
+      functionId: after!.functionId,
+      snapshotId:
+        newPos < trace.snapshots.length - 1
+          ? trace.snapshots[newPos + 1].id
+          : before!.snapshotId,
+    });
+  };
   const toggleOptionsWindow = () => setOptionsWindowOpen(!optionsWindowOpen);
-  console.log(optionsWindowOpen);
   return (
     <main className="app">
       <header className="app__header">
@@ -750,7 +785,8 @@ function App() {
                   active={activeSide === "before"}
                   onActivate={() => setActiveSide("before")}
                   onChange={updateBefore}
-                  matchOtherSide={matchAfter}
+                  matchOtherSideFunc={matchAfterFunc}
+                  matchOtherSideTrace={matchAfterTrace}
                 />
                 <SideSelector
                   side="after"
@@ -761,7 +797,8 @@ function App() {
                   active={activeSide === "after"}
                   onActivate={() => setActiveSide("after")}
                   onChange={updateAfter}
-                  matchOtherSide={matchBefore}
+                  matchOtherSideFunc={matchBeforeFunc}
+                  matchOtherSideTrace={matchBeforeTrace}
                 />
               </>
             )}
@@ -811,10 +848,16 @@ function App() {
                     {selectionsShareTrace && (
                       <>
                         <button
+                          disabled={!previousSelections}
+                          onClick={moveBackwards}
+                        >
+                          Both Backwards 1
+                        </button>
+                        <button
                           disabled={!nextSelections}
                           onClick={advanceBoth}
                         >
-                          Advance both
+                          Both Forwards 1
                         </button>
                         <button
                           disabled={!previousDifferenceSelections}
@@ -882,8 +925,8 @@ function App() {
                       : "%"}
                     {applicableSelectedElement.target.number}
                     {lastElementChange &&
-                    lastElementChange.beforeSnapshotId === before?.snapshotId &&
-                    lastElementChange.afterSnapshotId === after?.snapshotId
+                      lastElementChange.beforeSnapshotId === before?.snapshotId &&
+                      lastElementChange.afterSnapshotId === after?.snapshotId
                       ? ` · ${lastElementChange.reasons.join(", ")}`
                       : beforeElementOccurrence && !afterElementOccurrence
                         ? " · absent from After"
@@ -892,9 +935,9 @@ function App() {
                           : beforeElementOccurrence && afterElementOccurrence
                             ? ""
                             : elementNavigation?.hasElementInTrace(
-                                  applicableSelectedElement.target,
-                                  applicableSelectedElement.traceId,
-                                )
+                              applicableSelectedElement.target,
+                              applicableSelectedElement.traceId,
+                            )
                               ? " · absent from both selected snapshots"
                               : " · never observed in this function and trace"}
                   </div>
@@ -912,18 +955,15 @@ function App() {
                     return (
                       <button
                         key={entry.snapshot.id}
-                        className={`timeline__entry timeline__entry--${entry.status}${
-                          isComparisonSelection
+                        className={`timeline__entry timeline__entry--${entry.status}${isComparisonSelection
                             ? " timeline__entry--comparison-selected"
                             : ""
-                        }${
-                          entry.snapshot.id === activeSelection?.snapshotId
+                          }${entry.snapshot.id === activeSelection?.snapshotId
                             ? " timeline__entry--selected"
                             : ""
-                        }`}
-                        title={`${snapshotLabel(entry.snapshot)}: ${entry.status}${
-                          isBeforeSelection ? " · Before" : ""
-                        }${isAfterSelection ? " · After" : ""}`}
+                          }`}
+                        title={`${snapshotLabel(entry.snapshot)}: ${entry.status}${isBeforeSelection ? " · Before" : ""
+                          }${isAfterSelection ? " · After" : ""}`}
                         onClick={() => selectTimelineEntry(entry)}
                       >
                         <span className="timeline__marker" />

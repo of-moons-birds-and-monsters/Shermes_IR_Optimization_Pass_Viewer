@@ -275,6 +275,26 @@ export function advanceSelectionsTogether(
     after: { ...after, snapshotId: nextAfter.id },
   };
 }
+export function moveSelectionsBackwardsTogether(
+  before: Selection,
+  after: Selection,
+  cache: DumpNavigationCache,
+): { before: Selection; after: Selection } | undefined {
+  const beforeTrace = cache.snapshotIdToTrace.get(before.snapshotId);
+  const afterTrace = cache.snapshotIdToTrace.get(after.snapshotId);
+  if (!beforeTrace || beforeTrace.id !== afterTrace?.id) return undefined;
+  const beforePosition = cache.snapshotIdToPosition.get(before.snapshotId);
+  const afterPosition = cache.snapshotIdToPosition.get(after.snapshotId);
+  if (beforePosition === undefined || afterPosition === undefined)
+    return undefined;
+  const nextBefore = beforeTrace.snapshots[beforePosition - 1];
+  const nextAfter = beforeTrace.snapshots[afterPosition - 1];
+  if (!nextBefore || !nextAfter) return undefined;
+  return {
+    before: { ...before, snapshotId: nextBefore.id },
+    after: { ...after, snapshotId: nextAfter.id },
+  };
+}
 
 export function advanceSelectionsToNextDifference(
   before: Selection,

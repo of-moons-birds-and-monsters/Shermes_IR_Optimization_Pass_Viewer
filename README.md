@@ -14,9 +14,9 @@ Uses Vite 8 so requires Node.js ^20.19.0 >= 22.12.0
 **Dumps viewed in this app are not uploaded anywhere, everything runs locally in your browser**
 
 1. Dump the IR optimization pass output via `-Xdump-between-passes`
-2. cd into ir_pass_viewer
+2. cd into shermes_ir_pass_viewer
 3. install the dependencies with `npm install` or whatever package manager you want to use
-4. c Start the web app with `npm run dev` (uses vite)
+4. Start the web app with `npm run dev` (uses vite)
 5. Open the dump file via "Open dump file" button
 
 - file picker takes .txt .log .dump or .ll files
@@ -30,7 +30,7 @@ You must capture stderr to get the dump outputs. The pass content is written bas
     -typed \
     -Xdump-between-passes \
     input.ts \
-    &> output.dump 2>&1
+    &> output.dump
 ```
 
 ## Terms
@@ -39,7 +39,8 @@ You must capture stderr to get the dump outputs. The pass content is written bas
 
 **index**: the index of the dump
 
-**snapshots**: the output IR of a specific optimization pass being run on a function or multiple functions. A module scoped snapshot could contain the entire module.
+**snapshots**: IR output of initial state before optimization or the output after an optimization. Can contain a single function , or an entire module.
+A module scoped snapshot could contain the entire module.
 In the diff viewer mode you can only ever view a single function from a snapshot at a time.
 Snapshots are delimited by either the `*** INITIAL STATE` heading or `*** AFTER <pass-name>` heading.
 
@@ -68,9 +69,9 @@ Multiple optimization passes can happen multiple times over the course of a trac
 
 ## Features
 
-The UI is a diff viewer, it displays to Monaco editors for the before and after code along with function and snapshot selections, a timeline, and various navigation buttons.
+The UI is a diff viewer, it two to Monaco editors for the before and after code along with function and snapshot selections, a timeline, and various navigation buttons.
 The collapse buttons hide the selection and timeline.
-There is an options panel that lets you change the Monaco theme, it uses shiki js themes from the tm-theme package. There is no support for custom themes currently.
+There is an options panel that lets you change the Monaco theme, it uses shiki js themes from the tm-themes package. There is no support for custom themes currently.
 
 - you cannot turn off the shader background in the options menu. I am not allowing this.
 
@@ -101,34 +102,42 @@ The Timeline
 - You can select a particular functions particular optimization output with the "Snapshot" drop down
 - This dropdown will also show the [trace](#terms) a particular snapshot belongs
 
-To have one diff window function match the other click the "Match before/after" button to have that diff windows function match the other ones
-That button will not match the trace, only the function. You must manually select the Snapshot to be on the same trace if you want those navigation
-features to work (trace matching button will be added shortly)
+To have one diff window function match the other click the "Match Before/After Function" button to have that diff windows function match the other ones
+To match the trace to of the other diff window click the "Match Before/After Trace" button
 
 Within the snapshot dropdown you will see various snapshots labeled with states
 
 - **unavailable**: the function was not emitted in this trace/snapshot, but removal cannot be inferred.
-- **unknown**: the dump contains an ambiguous or inconsistent life cycle gap.
+- **unknown**: the dump contains an ambiguous or inconsistent lifecycle gap.
 - **introduced**: absent from the preceding snapshot and present in the current
   snapshot;
 - **unchanged**: present in both snapshots with equal `contentSha256` values;
 - **changed**: present in both snapshots with different `contentSha256` values;
 - **removed**: present in the preceding snapshot and absent from the current
   snapshot;
-- **unreachable**: present with `FunctionVersion.unreachable` set to true. Functions with this might have been removed or had their code moved to other functions
+- **unreachable**: present with `FunctionVersion.unreachable` set to true in the dump. The viewer itself does not infer why, but some common reasons are it might have been removed by an optimization pass or had their code moved to other functions
 - **present**: function is present in initial snapshot for the trace. The initial state will be marked with this.
 
 ### Navigation
 
-In order for the Next Element Change, Previous Element Change, Advance to Next Difference , and Go to previous difference to work you must
-be on the same function AND the same trace in both diff windows.
+`Previous snapshot` && `Next snapshot` Move the active sides snapshot backwards or forwards one snapshot relative to the current active snapshot.
 
-this kind of differnce nativation is currently restricted to the same function and same trace.
+The remaining options are only active when you are on the same function and same trace i both windows
+`Both Forwards 1` moves both sides forward by one snapshot
+
+`Both Backwards 1` moves both sides backwards by one snapshot
+
+Both of these will be greyed out if one side has no snapshot to move to.
+
+In order for the `Next element change`, `Previous element change`, `Advance to next difference` , and `Go to previous difference` to work you must
+be on the same function AND the same trace in both diff windows.
+This kind of difference navigation is currently restricted to the same function and same trace.
+
 `Advance to next difference` and `Go to previous difference` will move forward and backwards to the next time there is a difference in the function definitions.
 The entire function, and all its text, is hashed and the hashes are compared to determine if there is a difference.
 
 `Next element change` and `Previous element change` act on numbered instructions and basic blocks
-You can forwards or backwards to nearest change to that instruction or basic block
+You can move forwards or backwards to nearest change to that instruction or basic block
 
 You can select a numbered instruction by clicking on the actual number "%72" or select a basic block by clicking on the "%BB11" label.
 Clicking on a numbered instruction will select **that** instruction and not the instruction of the line it is on.
@@ -153,11 +162,13 @@ Example: you cannot select this line for tracking `StoreStackInst undefined: und
        ReturnInst %6: any
 ```
 
-Numbered instructions are those which return some value. This system is not perfect and I am going to try and expand this tracking to all instructions.
+Numbered instructions are those operations that have some destination. They take the form `%N = Instruction` .
+This means you cannot track a number of write/store operations. But unnumbered instruction tracking is being investigated.
+Numbered instructions are operations with a destination in the form `%N = Instruction` . This system is not perfect and I am going to try and expand this tracking to all instructions.
 
 However un-numbered instructions are still used when determining changes for basic blocks.
 
-Additionally you can enter a instruction label or basic block label in the `IR element` text input box and it will select the instruction or basic block
+Additionally you can enter an instruction label or basic block label in the `IR element` text input box and it will select the instruction or basic block
 Labels are case sensitive and must include the `%` sign
 Example: If you wanted to select the `%BB0` label you would enter `%BB0` into the text input box. If you wanted instruction "%3" you would enter "%3"
 
@@ -183,7 +194,7 @@ These are also spelled out in the navigation specification **ELEMENT_NAVIGATION.
 For instructions changes are not perfect. The changes are not aware of IR semantics. Additionally to prevent a lot of false positives positional changes are relative
 Instruction changes are when
 
-- the content of the instruction has been changed (content is hashed and this are compared)
+- the content of the instruction has been changed (content is hashed and compared to previous snapshots content)
 - the instruction is moved between basic blocks
 - when the basic block in unchanged by the relative order of the instructions does change
 
@@ -233,7 +244,7 @@ PrStoreInst %6: number, %2: object, 0: number, "i": string, true: boolean
 basic block changes are similar to instruction changes but simpler.,
 
 - the content of the block has changed (content is hashed and this are compared)
-- changed relative order amount blocks present in both snapshots
+- changed relative order among blocks present in both snapshots
   So if we have 2 basic blocks
 
 ```ll
