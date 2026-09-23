@@ -7,7 +7,8 @@ It is used for debugging Shermes optimizer transformations.
 
 Uses Vite 8 so requires Node.js ^20.19.0 or >= 22.12.0
 
-There is a spec for the dump parser format, and I am working out some kinks in it but it is ok enough for use.
+There is a spec for the dump parser format, and I am working out some kinks in it but it is ok enough for use. It is still in draft form
+however and subject to change.
 
 ## Usage
 
@@ -25,12 +26,25 @@ There is a spec for the dump parser format, and I am working out some kinks in i
 **Dumping with Shermes**
 You must capture stderr to get the dump outputs. The pass content is written basically entirely to stderr so you could probably just redirect that without stdout
 
-```
+```sh
   ./debug_build/bin/shermes \
     -typed \
     -Xdump-between-passes \
     input.ts \
     &> output.dump
+```
+
+If you want to augment the output with additional information about inlining decisions (where a function was inlined into) you can use
+the `-debug` flag to when generating the dump
+
+```sh
+  ./debug_build/bin/shermes \
+    -debug \
+    -typed \
+    -Xdump-between-passes \
+    input.ts \
+    &> output.dump
+
 ```
 
 ## Terms
