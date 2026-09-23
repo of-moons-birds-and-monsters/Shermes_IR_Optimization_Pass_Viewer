@@ -74,6 +74,8 @@ type SideSelectorProps = {
   hideRemovedSnapshots: boolean; // Hides almost all snapshot entires in the snapshot menu if they are marked removed. The first snapshot entry marked removed is saved because it must be displayed in the diff editor since removal is considered a change
   onActivate: () => void;
   onChange: (selection: Selection) => void;
+  matchOtherSideFunc: () => void; // this callback will cause this side to match the other side's function
+  matchOtherSideTrace: () => void; // this callback will cause this side to match the other side's trace
   matchOtherSide: (func: boolean, trace: boolean) => void;
 };
 function generateTimeStatusSymbol(entry: TimelineEntry): string {
@@ -99,15 +101,20 @@ function timelineEntryLabel(entry: TimelineEntry): string {
 }
 
 function MatchButton({
+  matchOtherSideFunc,
+  matchOtherSideTrace,
   matchOtherSide,
 }: {
   matchOtherSide: (func: boolean, trace: boolean) => void;
+  matchOtherSideFunc: () => void;
+  matchOtherSideTrace: () => void;
 }) {
   const [checked, setChecked] = useState({ func: false, trace: false });
 
   const handleMatch = () => {
     matchOtherSide(checked.func, checked.trace);
-
+    //if (checked.func) matchOtherSideFunc();
+    //if (checked.trace) matchOtherSideTrace();
     setChecked({ func: false, trace: false }); // clear checkboxes
   };
 
@@ -151,6 +158,8 @@ function SideSelector({
   hideRemovedSnapshots,
   onActivate,
   onChange,
+  matchOtherSideFunc,
+  matchOtherSideTrace,
   matchOtherSide,
 }: SideSelectorProps) {
   const selectedTrace = cache.snapshotIdToTrace.get(selection.snapshotId);
@@ -177,7 +186,10 @@ function SideSelector({
 
         <div>
           <div>
-            <MatchButton matchOtherSide={matchOtherSide} />
+            <MatchButton
+              matchOtherSideFunc={() => matchOtherSideFunc()}
+              matchOtherSideTrace={() => matchOtherSideTrace()}
+            />
           </div>
         </div>
       </header>
@@ -950,7 +962,6 @@ function App() {
       ? afterElementOccurrence.version.dumpRange.start -
         afterEntry.version.dumpRange.start
       : undefined;
-  // NOTE: do not memoize these objects, or else this breaks and risks stale data.
   const matchAfterSide = (func: boolean, trace: boolean) => {
     let nextFuncId = before!.functionId;
     let nextSnapshotId = before!.snapshotId;
@@ -987,7 +998,39 @@ function App() {
       snapshotId: nextSnapshotId,
     });
   };
+  // NOTE: do not memoize these objects, or else this breaks and risks stale data.
+  const matchAfterFunc = () =>
+    updateBefore({
+      functionId: after!.functionId,
+      snapshotId: before!.snapshotId,
+    });
 
+  const matchBeforeFunc = () =>
+    updateAfter({
+      functionId: before!.functionId,
+      snapshotId: after!.snapshotId,
+    });
+
+  const matchAfterTrace = () => {
+    const newPos = cache!.snapshotIdToPosition.get(after!.snapshotId)!;
+    const trace = cache!.snapshotIdToTrace.get(after!.snapshotId)!;
+    updateBefore({
+      functionId: before!.functionId,
+      snapshotId:
+        newPos > 0 ? trace.snapshots[newPos - 1].id : after!.snapshotId,
+    });
+  };
+  const matchBeforeTrace = () => {
+    const newPos = cache!.snapshotIdToPosition.get(before!.snapshotId)!;
+    const trace = cache!.snapshotIdToTrace.get(before!.snapshotId)!;
+    updateAfter({
+      functionId: after!.functionId,
+      snapshotId:
+        newPos < trace.snapshots.length - 1
+          ? trace.snapshots[newPos + 1].id
+          : before!.snapshotId,
+    });
+  };
   const toggleOptionsWindow = () => setOptionsWindowOpen(!optionsWindowOpen);
   const toggleHideRemovedSnapshots = () => {
     const nextValue = !hideRemovedSnapshots;
@@ -1083,6 +1126,8 @@ function App() {
                   onActivate={() => setActiveSide("before")}
                   matchOtherSide={matchAfterSide}
                   onChange={updateBefore}
+                  matchOtherSideFunc={matchAfterFunc}
+                  matchOtherSideTrace={matchAfterTrace}
                 />
                 <SideSelector
                   side="after"
@@ -1095,6 +1140,8 @@ function App() {
                   onActivate={() => setActiveSide("after")}
                   matchOtherSide={matchBeforeSide}
                   onChange={updateAfter}
+                  matchOtherSideFunc={matchBeforeFunc}
+                  matchOtherSideTrace={matchBeforeTrace}
                 />
               </>
             )}
