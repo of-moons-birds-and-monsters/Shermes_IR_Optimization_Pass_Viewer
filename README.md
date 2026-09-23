@@ -47,44 +47,10 @@ the `-debug` flag to when generating the dump
 
 ```
 
-## Terms
-
-**dump**: the output of `-Xdump-between-passes`
-
-**index**: the index of the dump
-
-**snapshots**: IR output of initial state before optimization or the output after an optimization. Can contain a single function , or an entire module.
-A module scoped snapshot could contain the entire module.
-In the diff viewer mode you can only ever view a single function from a snapshot at a time.
-Snapshots are delimited by either the `*** INITIAL STATE` heading or `*** AFTER <pass-name>` heading.
-
-**trace**: (From DUMP_INDEX_FORMAT.md)
-
-```
-A trace segment begins with one `*** INITIAL STATE` heading and continues up to,
-but not including, the next `*** INITIAL STATE` heading or the end of the dump.
-
-```
-
-A trace is an ordered series of snapshots which belong to one optimizer run over a function or over a whole module.
-Current dump format cannot distinguish a one-function module trace from a function trace, which is why it may be classified as `unknown`
-`*** INITIAL STATE` Is something output by shermes itself.
-It is output before a run of optimizations passes on a module is started and before a run of optimizations passes on a function is started.
-Check these methods to see the prints. Shermes PassManager.cpp (where they are found as of 2026-09-20)
-
-```
-void PassManager::run(Function *F);
-bool PassManager::run(Module *M)
-```
-
-Each trace contains a variable number of dumps of IR pass output (snapshots).
-Sometimes functions will have multiple outputs of a specific optimization pass in a single trace.
-Multiple optimization passes can happen multiple times over the course of a trace.
-
 ## Features
 
 The UI is a diff viewer, it two to Monaco editors for the before and after code along with function and snapshot selections, a timeline, and various navigation buttons.
-The collapse buttons hide the selection and timeline.
+The collapse, `<`, buttons hide the selection and timeline.
 There is an options panel that lets you change the Monaco theme, it uses shiki js themes from the tm-themes package. There is no support for custom themes currently.
 
 - you cannot turn off the shader background in the options menu. I am not allowing this.
@@ -332,6 +298,8 @@ There are two main components with this project
 The parser is integrated with the UI, just press the `Open dump file` button and the parser will run
 
 **Specifications**
+The specifications for this project are still considered drafts and subject to change.
+
 The parser also has a standalone spec its based on , `DUMP_INDEX_FORMAT.md`
 
 The spec explains the format and expected contents of the index it creates from the dump
@@ -353,7 +321,40 @@ It tries to define things like "what are changes between basic block" in a basic
 Coming soon:
 
 - cross trace navigation (if no issues are found that would make this impossible)
-- trace matching button
 
 better UI.
 The options menu needs so much work, I cannot do shaders and I cannot get AI to do the shaders for me well so it does not match well.
+
+## Terms
+
+**dump**: the output of `-Xdump-between-passes`
+
+**index**: the index of the dump
+
+**snapshots**: IR output of initial state before optimization or the output after an optimization. Can contain a single function , or an entire module.
+A module scoped snapshot could contain the entire module.
+In the diff viewer mode you can only ever view a single function from a snapshot at a time.
+Snapshots are delimited by either the `*** INITIAL STATE` heading or `*** AFTER <pass-name>` heading.
+
+**trace**: (From DUMP_INDEX_FORMAT.md)
+
+```
+A trace segment begins with one `*** INITIAL STATE` heading and continues up to,
+but not including, the next `*** INITIAL STATE` heading or the end of the dump.
+
+```
+
+A trace is an ordered series of snapshots which belong to one optimizer run over a function or over a whole module.
+Current dump format cannot distinguish a one-function module trace from a function trace, which is why it may be classified as `unknown`
+`*** INITIAL STATE` Is something output by shermes itself.
+It is output before a run of optimizations passes on a module is started and before a run of optimizations passes on a function is started.
+Check these methods to see the prints. Shermes PassManager.cpp (where they are found as of 2026-09-20)
+
+```
+void PassManager::run(Function *F);
+bool PassManager::run(Module *M)
+```
+
+Each trace contains a variable number of dumps of IR pass output (snapshots).
+Sometimes functions will have multiple outputs of a specific optimization pass in a single trace.
+Multiple optimization passes can happen multiple times over the course of a trace.

@@ -98,6 +98,52 @@ function timelineEntryLabel(entry: TimelineEntry): string {
     ? `[${generateTimeStatusSymbol(entry)} ${entry.status.toUpperCase()} · ⚠ UNREACHABLE]`
     : `[${generateTimeStatusSymbol(entry)} ${entry.status.toUpperCase()}]`;
 }
+
+function MatchButton({
+  matchOtherSideFunc,
+  matchOtherSideTrace,
+}: {
+  matchOtherSideFunc: () => void;
+  matchOtherSideTrace: () => void;
+}) {
+  const [checked, setChecked] = useState({ func: false, trace: false });
+
+  const handleMatch = () => {
+    if (checked.func) matchOtherSideFunc();
+    if (checked.trace) matchOtherSideTrace();
+    setChecked({ func: false, trace: false }); // clear checkboxes
+  };
+
+  return (
+    <div className="match-other-side-options" id="select-matching-type">
+      <button onClick={handleMatch}>Match</button>
+      <div>
+        <input
+          type="checkbox"
+          name="choice-1"
+          id="choice-1"
+          checked={checked.func}
+          onChange={(e) =>
+            setChecked((c) => ({ ...c, func: e.target.checked }))
+          }
+        />
+        <label htmlFor="choice-1">Function</label>
+      </div>
+      <div>
+        <input
+          type="checkbox"
+          name="choice-2"
+          id="choice-2"
+          checked={checked.trace}
+          onChange={(e) =>
+            setChecked((c) => ({ ...c, trace: e.target.checked }))
+          }
+        />
+        <label htmlFor="choice-2">Trace</label>
+      </div>
+    </div>
+  );
+}
 function SideSelector({
   side,
   index,
@@ -133,12 +179,14 @@ function SideSelector({
       <header className="side-selector__heading">
         <h2>{side === "before" ? "Before" : "After"}</h2>
 
-        <button onClick={() => matchOtherSide()}>
-          Match {side === "before" ? "After" : "Before"} Function
-        </button>
-        <button onClick={() => matchOtherSideTrace()}>
-          Match {side === "before" ? "After" : "Before"} Trace
-        </button>
+        <div>
+          <div>
+            <MatchButton
+              matchOtherSideFunc={() => matchOtherSide()}
+              matchOtherSideTrace={() => matchOtherSideTrace()}
+            />
+          </div>
+        </div>
       </header>
 
       <div className="side-selector__content">
