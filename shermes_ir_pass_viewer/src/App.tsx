@@ -422,6 +422,7 @@ function NavigationPair({
         >
           ←
         </button>
+        <div className="divider"></div>
 
         <button
           type="button"
@@ -1123,10 +1124,11 @@ function App() {
                 )}
 
                 {!timelineCollapsed && (
-                  <div className="timeline__navigation">
-                    <label className="element-navigation__input">
-                      IR element
+                  <div className="timeline__toolbar">
+                    <div className="timeline__element-picker">
+                      <label htmlFor="ir-element-input">IR element</label>
                       <input
+                        id="ir-element-input"
                         value={elementInput}
                         placeholder="%72 or %BB11"
                         onChange={(event) => {
@@ -1137,67 +1139,60 @@ function App() {
                           if (event.key === "Enter") selectElementFromInput();
                         }}
                       />
-                    </label>
-                    <button onClick={selectElementFromInput}>
-                      Select element
-                    </button>
-                    <button
-                      disabled={!previousElementChange}
-                      onClick={() => applyElementChange(previousElementChange)}
-                    >
-                      Previous element change
-                    </button>
-                    <button
-                      disabled={!nextElementChange}
-                      onClick={() => applyElementChange(nextElementChange)}
-                    >
-                      Next element change
-                    </button>
+                      <button onClick={selectElementFromInput}>Select</button>
+                    </div>
 
-                    {selectionsShareTrace && (
-                      <>
-                        <button
-                          disabled={!previousSelections}
-                          onClick={moveBackwards}
-                        >
-                          Both Backwards 1
-                        </button>
-                        <button
-                          disabled={!nextSelections}
-                          onClick={advanceBoth}
-                        >
-                          Both Forwards 1
-                        </button>
-                        <button
-                          disabled={!previousDifferenceSelections}
-                          onClick={goToPreviousDifference}
-                        >
-                          Prev diff
-                        </button>
-                        <button
-                          disabled={!nextDifferenceSelections}
-                          onClick={advanceToNextDifference}
-                        >
-                          Next diff
-                        </button>
-                      </>
-                    )}
-                    <button
-                      disabled={!previousTimelineEntry}
-                      onClick={() => stepTimeline(-1)}
-                    >
-                      Previous snapshot
-                    </button>
-                    <button
-                      disabled={
-                        !nextTimelineEntry ||
-                        (hideRemovedSnapshots &&
-                          nextTimelineEntry.afterRemovalBoundary)
-                      }
-                      onClick={() => stepTimeline(1)}
-                    >
-                      Next snapshot
-                    </button>
+                    <div className="timeline__navigation-groups">
+                      <NavigationPair
+                        label="Snapshot"
+                        previousLabel="Previous snapshot"
+                        nextLabel="Next snapshot"
+                        previousDisabled={!previousTimelineEntry}
+                        nextDisabled={
+                          !nextTimelineEntry ||
+                          (hideRemovedSnapshots &&
+                            nextTimelineEntry.afterRemovalBoundary)
+                        }
+                        onPrevious={() => stepTimeline(-1)}
+                        onNext={() => stepTimeline(1)}
+                      />
+
+                      {selectionsShareTrace && (
+                        <>
+                          <NavigationPair
+                            label="Both sides"
+                            previousLabel="Move both backward"
+                            nextLabel="Move both forward"
+                            previousDisabled={!previousSelections}
+                            nextDisabled={!nextSelections}
+                            onPrevious={moveBackwards}
+                            onNext={advanceBoth}
+                          />
+
+                          <NavigationPair
+                            label="Difference"
+                            previousLabel="Previous difference"
+                            nextLabel="Next difference"
+                            previousDisabled={!previousDifferenceSelections}
+                            nextDisabled={!nextDifferenceSelections}
+                            onPrevious={goToPreviousDifference}
+                            onNext={advanceToNextDifference}
+                          />
+                        </>
+                      )}
+
+                      <NavigationPair
+                        label="Element change"
+                        previousLabel="Previous element change"
+                        nextLabel="Next element change"
+                        previousDisabled={!previousElementChange}
+                        nextDisabled={!nextElementChange}
+                        onPrevious={() =>
+                          applyElementChange(previousElementChange)
+                        }
+                        onNext={() => applyElementChange(nextElementChange)}
+                      />
+                    </div>
                   </div>
                 )}
 

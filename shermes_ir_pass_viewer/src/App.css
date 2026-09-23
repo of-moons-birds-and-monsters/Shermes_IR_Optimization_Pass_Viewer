@@ -667,6 +667,8 @@ button {
   align-items: end;
   gap: 0.35rem;
   flex: 0 0 auto;
+  /* This makes it slightlyy out of alignment with  the the botton of the control buttons, enjoy */
+  align-items: center;
 }
 
 .timeline__navigation-groups {
@@ -686,15 +688,22 @@ button {
 .navigation-pair__label {
   color: var(--muted);
   font-size: 0.68rem;
+  align-self: center;
+  justify-self: center;
 }
 
 .navigation-pair__buttons {
   display: inline-flex;
+
+  .divider {
+    width: 5px;
+  }
 }
 
 .navigation-pair__buttons button {
   min-width: 2.2rem;
   border-radius: 0;
+  font-size: 1rem;
 }
 
 .navigation-pair__buttons button:first-child {
@@ -702,7 +711,7 @@ button {
 }
 
 .navigation-pair__buttons button:last-child {
-  border-left-width: 0;
+  /*border-left-width: 0;*/
   border-radius: 0 var(--border-radius) var(--border-radius) 0;
 }
 
