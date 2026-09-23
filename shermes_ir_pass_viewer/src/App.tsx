@@ -566,8 +566,16 @@ function App() {
 
   useLayoutEffect(() => {
     const track = timelineTrackRef.current;
-    if (!track || timelineCollapsed || !activeTrace || track.clientWidth === 0)
+    const scroll = timelineScrollRef.current;
+    if (
+      !scroll ||
+      !track ||
+      timelineCollapsed ||
+      !activeTrace ||
+      track.clientWidth === 0
+    ) {
       return;
+    }
 
     const selectedPositions: number[] = [];
     if (beforeTrace?.id === activeTrace.id && beforePosition !== undefined) {
@@ -587,46 +595,55 @@ function App() {
       .filter((entry): entry is HTMLElement => entry !== null);
     if (selectedEntries.length !== selectedPositions.length) return;
 
-    const trackBounds = track.getBoundingClientRect();
+    const trackBounds = scroll.getBoundingClientRect();
     const entryBounds = selectedEntries.map((entry) =>
       entry.getBoundingClientRect(),
     );
+    // old working
+    //const selectionLeft =
+    //  Math.min(...entryBounds.map((bounds) => bounds.left)) -
+    //  trackBounds.left +
+    //  track.scrollLeft;
+    //const selectionRight =
+    //  Math.max(...entryBounds.map((bounds) => bounds.right)) -
+    //  trackBounds.left +
+    //  track.scrollLeft;
+    // old working
+    // Do not choose one selection over the other when they cannot both fit.
+    //if (selectionRight - selectionLeft > track.clientWidth) return;
+    //old working
+    //const visibleLeft = track.scrollLeft;
+    //const visibleRight = visibleLeft + track.clientWidth;
+    //let nextScrollLeft = visibleLeft;
+    //if (selectionLeft < visibleLeft) {
+    //  nextScrollLeft = selectionLeft;
+    //} else if (selectionRight > visibleRight) {
+    //  nextScrollLeft = selectionRight - track.clientWidth;
+    //}
+
     const selectionLeft =
       Math.min(...entryBounds.map((bounds) => bounds.left)) -
       trackBounds.left +
-      track.scrollLeft;
+      scroll.scrollLeft;
     const selectionRight =
       Math.max(...entryBounds.map((bounds) => bounds.right)) -
       trackBounds.left +
-      track.scrollLeft;
+      scroll.scrollLeft;
 
     // Do not choose one selection over the other when they cannot both fit.
-    if (selectionRight - selectionLeft > track.clientWidth) return;
+    if (selectionRight - selectionLeft > scroll.clientWidth) return;
 
-    const visibleLeft = track.scrollLeft;
-    const visibleRight = visibleLeft + track.clientWidth;
+    const visibleLeft = scroll.scrollLeft;
+    const visibleRight = visibleLeft + scroll.clientWidth;
     let nextScrollLeft = visibleLeft;
     if (selectionLeft < visibleLeft) {
       nextScrollLeft = selectionLeft;
     } else if (selectionRight > visibleRight) {
-      nextScrollLeft = selectionRight - track.clientWidth;
+      nextScrollLeft = selectionRight - scroll.clientWidth;
     }
-    console.log("visibleLeft: ", visibleLeft);
-    console.log("visibleRight: ", visibleRight);
-    console.log("selectionLeft: ", selectionLeft);
-    console.log("selectionRight: ", selectionRight);
-    console.log("nextScrollLeft: ", nextScrollLeft);
 
     if (nextScrollLeft !== visibleLeft) {
-      if (timelineScrollRef && timelineScrollRef.current) {
-        console.log("scrolling to ", nextScrollLeft);
-        timelineScrollRef.current.scrollTo({
-          left: nextScrollLeft,
-          behavior: "smooth",
-        });
-      }
-
-      //track.scrollTo({ left: nextScrollLeft, behavior: "smooth" });
+      scroll.scrollTo({ left: nextScrollLeft, behavior: "smooth" });
     }
   }, [
     activeTrace,
