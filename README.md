@@ -320,10 +320,11 @@ It tries to define things like "what are changes between basic block" in a basic
 
 Coming soon:
 
+- composite timelines: timelines consist of multiple different functions and their snapshots to enable tracking of inlined basic blocks through their movements
 - cross trace navigation (if no issues are found that would make this impossible)
 
-better UI.
-The options menu needs so much work, I cannot do shaders and I cannot get AI to do the shaders for me well so it does not match well.
+- better UI.
+  The options menu needs so much work, I cannot do shaders and I cannot get AI to do the shaders for me well so it does not match well.
 
 ## Terms
 
